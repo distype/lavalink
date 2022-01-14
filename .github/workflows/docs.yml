@@ -1,0 +1,62 @@
+name: Docs
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  push-docs:
+    name: Push Docs
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node: [16]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Cache node modules
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: Setup node
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node }}
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install packages
+        run: npm i --also=dev
+
+      - name: Run docs
+        run: npm run docs
+
+      - name: Push docs
+        run: |
+          REPO="https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          TARGET_BRANCH="docs"
+          git clone $REPO out -b $TARGET_BRANCH
+          rm -rfv out/docs/*
+          rsync -vaI LICENSE out/
+          rsync -vaI README.md out/
+          rsync -vaI docs/ out/docs
+          cd out
+          git add --all .
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_EMAIL}"
+          git commit -m "docs: TypeDoc build for ${GITHUB_SHA}" || true
+          git push origin $TARGET_BRANCH
+        env:
+          GITHUB_TOKEN: ${{ secrets.BUILD_TOKEN }}
+          GITHUB_ACTOR: BR88C
+          GITHUB_EMAIL: br88c@br88c.dev
