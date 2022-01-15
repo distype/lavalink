@@ -11,8 +11,8 @@ export class DiscordjsAdapter extends BaseAdapter {
     }
 
     public bind (manager: LavalinkManager): void {
-        this.client.ws.on(`VOICE_SERVER_UPDATE`, (data) => manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data));
-        this.client.ws.on(`VOICE_STATE_UPDATE`, (data) => manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data));
+        this.client.ws.on(`VOICE_SERVER_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data));
+        this.client.ws.on(`VOICE_STATE_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data));
     }
 
     public getBotId (): Snowflake {

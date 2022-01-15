@@ -11,8 +11,8 @@ export class DistypeAdapter extends BaseAdapter {
     }
 
     public bind (manager: LavalinkManager): void {
-        this.client.gateway.on(`VOICE_SERVER_UPDATE`, (data) => manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data.d));
-        this.client.gateway.on(`VOICE_STATE_UPDATE`, (data) => manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data.d));
+        this.client.gateway.on(`VOICE_SERVER_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data.d));
+        this.client.gateway.on(`VOICE_STATE_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data.d));
     }
 
     public getBotId (): Snowflake {
