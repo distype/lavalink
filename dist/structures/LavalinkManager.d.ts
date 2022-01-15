@@ -276,7 +276,7 @@ export declare class LavalinkManager extends TypedEmitter<LavalinkManagerEvents>
      * @param data Data from the event.
      * @internal
      */
-    _handleVoiceUpdate<T extends `VOICE_SERVER_UPDATE` | `VOICE_STATE_UPDATE`>(event: T, data: T extends `VOICE_SERVER_UPDATE` ? GatewayVoiceServerUpdateDispatchData : GatewayVoiceStateUpdateDispatchData): void;
+    _handleVoiceUpdate<T extends `VOICE_SERVER_UPDATE` | `VOICE_STATE_UPDATE`>(event: T, data: T extends `VOICE_SERVER_UPDATE` ? GatewayVoiceServerUpdateDispatchData : GatewayVoiceStateUpdateDispatchData): Promise<void>;
     /**
      * Authorize with Spotify.
      * @returns The time the token is valid for in milliseconds.

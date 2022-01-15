@@ -7,7 +7,7 @@ export declare class DiscordjsAdapter extends BaseAdapter {
     constructor(client: Client);
     bind(manager: LavalinkManager): void;
     getBotId(): Snowflake;
-    getGuildShardSessionId(guildId: Snowflake): string;
+    getGuildShardSessionId(guildId: Snowflake): Promise<string>;
     hasPerms(guildId: Snowflake, channelId?: Snowflake): Promise<Permissions>;
     isStage(channelId: Snowflake): Promise<boolean>;
     modifyCurrentUserVoiceState(guildId: Snowflake, data: RESTPatchAPIGuildVoiceStateCurrentMemberJSONBody): Promise<void>;

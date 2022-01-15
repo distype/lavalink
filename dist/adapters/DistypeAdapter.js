@@ -9,8 +9,8 @@ class DistypeAdapter extends BaseAdapter_1.BaseAdapter {
         this.client = client;
     }
     bind(manager) {
-        this.client.gateway.on(`VOICE_SERVER_UPDATE`, (data) => manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data.d));
-        this.client.gateway.on(`VOICE_STATE_UPDATE`, (data) => manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data.d));
+        this.client.gateway.on(`VOICE_SERVER_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data.d));
+        this.client.gateway.on(`VOICE_STATE_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data.d));
     }
     getBotId() {
         if (!this.client.gateway.user)

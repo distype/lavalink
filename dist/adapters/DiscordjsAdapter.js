@@ -9,15 +9,15 @@ class DiscordjsAdapter extends BaseAdapter_1.BaseAdapter {
         this.client = client;
     }
     bind(manager) {
-        this.client.ws.on(`VOICE_SERVER_UPDATE`, (data) => manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data));
-        this.client.ws.on(`VOICE_STATE_UPDATE`, (data) => manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data));
+        this.client.ws.on(`VOICE_SERVER_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data));
+        this.client.ws.on(`VOICE_STATE_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data));
     }
     getBotId() {
         if (!this.client.user)
             throw new Error(`Gateway has not received a payload with a self user`);
         return this.client.user.id;
     }
-    getGuildShardSessionId(guildId) {
+    async getGuildShardSessionId(guildId) {
         // @ts-expect-error Property 'sessionId' is private and only accessible within class 'WebSocketShard'.
         const sessionId = (this.client.guilds.cache.get(guildId) ?? await this.client.guilds.fetch(guildId)).shard.sessionId;
         if (!sessionId)

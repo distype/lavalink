@@ -254,7 +254,7 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
      * @param data Data from the event.
      * @internal
      */
-    _handleVoiceUpdate(event, data) {
+    async _handleVoiceUpdate(event, data) {
         if (!data.guild_id)
             return;
         const player = this.players.get(data.guild_id);
@@ -269,7 +269,7 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
             player.node.send({
                 op: `voiceUpdate`,
                 guildId: player.options.guildId,
-                sessionId: this.adapter.getGuildShardSessionId(player.options.guildId),
+                sessionId: await this.adapter.getGuildShardSessionId(player.options.guildId),
                 event: data
             }).catch(() => { });
         }

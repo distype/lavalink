@@ -29,7 +29,7 @@ export declare abstract class BaseAdapter {
      * Should return the guild's shard's [session ID](https://discord.com/developers/docs/topics/gateway#ready).
      * @param guildId The guild to get the shard [session ID](https://discord.com/developers/docs/topics/gateway#ready) from.
      */
-    abstract getGuildShardSessionId(guildId: Snowflake): string;
+    abstract getGuildShardSessionId(guildId: Snowflake): Promise<string> | string;
     /**
      * Should check the bot's [permissions](https://discord.com/developers/docs/topics/permissions) in a guild / channel.
      * @param guildId The guild to pull permissions from.
