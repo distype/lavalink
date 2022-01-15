@@ -415,7 +415,7 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
      * @param data Data from the event.
      * @internal
      */
-    public async _handleVoiceUpdate <T extends `VOICE_SERVER_UPDATE` | `VOICE_STATE_UPDATE`>(event: T, data: T extends `VOICE_SERVER_UPDATE` ? GatewayVoiceServerUpdateDispatchData : GatewayVoiceStateUpdateDispatchData): void {
+    public async _handleVoiceUpdate <T extends `VOICE_SERVER_UPDATE` | `VOICE_STATE_UPDATE`>(event: T, data: T extends `VOICE_SERVER_UPDATE` ? GatewayVoiceServerUpdateDispatchData : GatewayVoiceStateUpdateDispatchData): Promise<void> {
         if (!data.guild_id) return;
         const player = this.players.get(data.guild_id);
         if (!player) return;
