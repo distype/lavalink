@@ -2,17 +2,16 @@ import { BaseAdapter, Permissions } from './BaseAdapter';
 
 import { LavalinkManager } from '../typings/lib';
 
-import { Client, ShardClientUtil } from 'discord.js';
 import { GatewayVoiceStateUpdateData, RESTPatchAPIGuildVoiceStateCurrentMemberJSONBody, Snowflake } from 'discord-api-types/v9';
 
 export class DiscordjsAdapter extends BaseAdapter {
-    constructor (public client: Client) {
+    constructor (public client: any) {
         super();
     }
 
     public bind (manager: LavalinkManager): void {
-        this.client.ws.on(`VOICE_SERVER_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data));
-        this.client.ws.on(`VOICE_STATE_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data));
+        this.client.ws.on(`VOICE_SERVER_UPDATE`, (data: any) => void manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data));
+        this.client.ws.on(`VOICE_STATE_UPDATE`, (data: any) => void manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data));
     }
 
     public getBotId (): Snowflake {
@@ -21,7 +20,6 @@ export class DiscordjsAdapter extends BaseAdapter {
     }
 
     public async getGuildShardSessionId (guildId: Snowflake): Promise<string> {
-        // @ts-expect-error Property 'sessionId' is private and only accessible within class 'WebSocketShard'.
         const sessionId = (this.client.guilds.cache.get(guildId) ?? await this.client.guilds.fetch(guildId)).shard.sessionId;
         if (!sessionId) throw new Error(`Guild shard has not received session ID`);
         return sessionId;
@@ -61,7 +59,10 @@ export class DiscordjsAdapter extends BaseAdapter {
         }
     }
 
-    public updateVoiceState (data: GatewayVoiceStateUpdateData): void {
+    public async updateVoiceState (data: GatewayVoiceStateUpdateData): Promise<void> {
+        // @ts-expect-error Cannot find module 'discord.js' or its corresponding type declarations.
+        const { ShardClientUtil } = await import(`discord.js`);
+
         if (typeof this.client.shard?.count !== `number`) throw new Error(`Unable to get shard count`);
         const shard = this.client.ws.shards.get(ShardClientUtil.shardIdForGuildId(data.guild_id, this.client.shard.count));
         if (!shard) throw new Error(`Unable to get shard to send voice state update`);

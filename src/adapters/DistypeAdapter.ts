@@ -3,16 +3,15 @@ import { BaseAdapter, Permissions } from './BaseAdapter';
 import { LavalinkManager } from '../typings/lib';
 
 import { ChannelType, GatewayVoiceStateUpdateData, RESTPatchAPIGuildVoiceStateCurrentMemberJSONBody, Snowflake } from 'discord-api-types/v9';
-import { CachedRole, Client, PermissionsUtils } from 'distype';
 
 export class DistypeAdapter extends BaseAdapter {
-    constructor (public client: Client) {
+    constructor (public client: any) {
         super();
     }
 
     public bind (manager: LavalinkManager): void {
-        this.client.gateway.on(`VOICE_SERVER_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data.d));
-        this.client.gateway.on(`VOICE_STATE_UPDATE`, (data) => void manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data.d));
+        this.client.gateway.on(`VOICE_SERVER_UPDATE`, (data: any) => void manager._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, data.d));
+        this.client.gateway.on(`VOICE_STATE_UPDATE`, (data: any) => void manager._handleVoiceUpdate(`VOICE_STATE_UPDATE`, data.d));
     }
 
     public getBotId (): Snowflake {
@@ -27,6 +26,9 @@ export class DistypeAdapter extends BaseAdapter {
     }
 
     public async hasPerms (guildId: Snowflake, channelId?: Snowflake): Promise<Permissions> {
+        // @ts-expect-error Cannot find module 'distype' or its corresponding type declarations.
+        const { PermissionsUtils } = await import(`distype`);
+
         const cacheControlOptions = this.client.options.cache.cacheControl;
 
         const permissionsMember = { user: {
@@ -37,7 +39,7 @@ export class DistypeAdapter extends BaseAdapter {
         const permissionsGuild = {
             id: guildId,
             owner_id: (cacheControlOptions.guilds?.includes(`owner_id`) ? this.client.cache.guilds?.get(guildId)?.owner_id : undefined) ?? (await this.client.rest.getGuild(guildId)).owner_id,
-            roles: (cacheControlOptions.roles?.includes(`permissions`)) ? this.client.cache.roles?.filter((role) => role.guild_id === guildId && role.permissions !== undefined) as (Array<CachedRole & { permissions: string }> | undefined) : undefined ?? (await this.client.rest.getGuildRoles(guildId))
+            roles: (cacheControlOptions.roles?.includes(`permissions`)) ? this.client.cache.roles?.filter((role: any) => role.guild_id === guildId && role.permissions !== undefined) : undefined ?? (await this.client.rest.getGuildRoles(guildId))
         };
 
         const permissionsChannel = channelId ? { permission_overwrites: (cacheControlOptions.channels?.includes(`permission_overwrites`) ? this.client.cache.channels?.get(channelId)?.permission_overwrites : undefined) ?? (await this.client.rest.getChannel(channelId)).permission_overwrites } : undefined;
