@@ -20,8 +20,7 @@ export class DiscordjsAdapter extends BaseAdapter {
         return this.client.user.id;
     }
 
-    public getGuildShardSessionId (guildId: Snowflake): string {
-        // @ts-expect-error Property 'sessionId' is private and only accessible within class 'WebSocketShard'.
+    public async getGuildShardSessionId (guildId: Snowflake): Promise<string> {
         const sessionId = (this.client.guilds.cache.get(guildId) ?? await this.client.guilds.fetch(guildId)).shard.sessionId;
         if (!sessionId) throw new Error(`Guild shard has not received session ID`);
         return sessionId;

@@ -427,7 +427,7 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
             player.node.send({
                 op: `voiceUpdate`,
                 guildId: player.options.guildId,
-                sessionId: this.adapter.getGuildShardSessionId(player.options.guildId),
+                sessionId: await this.adapter.getGuildShardSessionId(player.options.guildId),
                 event: data
             }).catch(() => {});
         }
