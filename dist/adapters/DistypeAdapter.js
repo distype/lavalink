@@ -1,8 +1,26 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DistypeAdapter = void 0;
 const BaseAdapter_1 = require("./BaseAdapter");
-const distype_1 = require("distype");
 class DistypeAdapter extends BaseAdapter_1.BaseAdapter {
     constructor(client) {
         super();
@@ -24,6 +42,8 @@ class DistypeAdapter extends BaseAdapter_1.BaseAdapter {
         return shard.sessionId;
     }
     async hasPerms(guildId, channelId) {
+        // @ts-expect-error Cannot find module 'distype' or its corresponding type declarations.
+        const { PermissionsUtils } = await Promise.resolve().then(() => __importStar(require(`distype`)));
         const cacheControlOptions = this.client.options.cache.cacheControl;
         const permissionsMember = { user: {
                 id: this.getBotId(),
@@ -35,15 +55,15 @@ class DistypeAdapter extends BaseAdapter_1.BaseAdapter {
             roles: (cacheControlOptions.roles?.includes(`permissions`)) ? this.client.cache.roles?.filter((role) => role.guild_id === guildId && role.permissions !== undefined) : undefined ?? (await this.client.rest.getGuildRoles(guildId))
         };
         const permissionsChannel = channelId ? { permission_overwrites: (cacheControlOptions.channels?.includes(`permission_overwrites`) ? this.client.cache.channels?.get(channelId)?.permission_overwrites : undefined) ?? (await this.client.rest.getChannel(channelId)).permission_overwrites } : undefined;
-        const perms = channelId ? distype_1.PermissionsUtils.channelPermissions(permissionsMember, permissionsGuild, permissionsChannel) : distype_1.PermissionsUtils.guildPermissions(permissionsMember, permissionsGuild);
+        const perms = channelId ? PermissionsUtils.channelPermissions(permissionsMember, permissionsGuild, permissionsChannel) : PermissionsUtils.guildPermissions(permissionsMember, permissionsGuild);
         return {
-            CONNECT: distype_1.PermissionsUtils.hasPerm(perms, `CONNECT`),
-            EMBED_LINKS: distype_1.PermissionsUtils.hasPerm(perms, `EMBED_LINKS`),
-            MUTE_MEMBERS: distype_1.PermissionsUtils.hasPerm(perms, `MUTE_MEMBERS`),
-            REQUEST_TO_SPEAK: distype_1.PermissionsUtils.hasPerm(perms, `REQUEST_TO_SPEAK`),
-            SEND_MESSAGES: distype_1.PermissionsUtils.hasPerm(perms, `SEND_MESSAGES`),
-            SPEAK: distype_1.PermissionsUtils.hasPerm(perms, `SPEAK`),
-            VIEW_CHANNEL: distype_1.PermissionsUtils.hasPerm(perms, `VIEW_CHANNEL`)
+            CONNECT: PermissionsUtils.hasPerm(perms, `CONNECT`),
+            EMBED_LINKS: PermissionsUtils.hasPerm(perms, `EMBED_LINKS`),
+            MUTE_MEMBERS: PermissionsUtils.hasPerm(perms, `MUTE_MEMBERS`),
+            REQUEST_TO_SPEAK: PermissionsUtils.hasPerm(perms, `REQUEST_TO_SPEAK`),
+            SEND_MESSAGES: PermissionsUtils.hasPerm(perms, `SEND_MESSAGES`),
+            SPEAK: PermissionsUtils.hasPerm(perms, `SPEAK`),
+            VIEW_CHANNEL: PermissionsUtils.hasPerm(perms, `VIEW_CHANNEL`)
         };
     }
     async isStage(channelId) {

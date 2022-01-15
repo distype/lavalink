@@ -1,10 +1,9 @@
 import { BaseAdapter, Permissions } from './BaseAdapter';
 import { LavalinkManager } from '../typings/lib';
 import { GatewayVoiceStateUpdateData, RESTPatchAPIGuildVoiceStateCurrentMemberJSONBody, Snowflake } from 'discord-api-types/v9';
-import { Client } from 'distype';
 export declare class DistypeAdapter extends BaseAdapter {
-    client: Client;
-    constructor(client: Client);
+    client: any;
+    constructor(client: any);
     bind(manager: LavalinkManager): void;
     getBotId(): Snowflake;
     getGuildShardSessionId(guildId: Snowflake): string;
