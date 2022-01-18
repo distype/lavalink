@@ -1,23 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DiscordjsAdapter = void 0;
 const BaseAdapter_1 = require("./BaseAdapter");
@@ -76,11 +57,7 @@ class DiscordjsAdapter extends BaseAdapter_1.BaseAdapter {
         }
     }
     async updateVoiceState(data) {
-        // @ts-expect-error Cannot find module 'discord.js' or its corresponding type declarations.
-        const { ShardClientUtil } = await Promise.resolve().then(() => __importStar(require(`discord.js`)));
-        if (typeof this.client.shard?.count !== `number`)
-            throw new Error(`Unable to get shard count`);
-        const shard = this.client.ws.shards.get(ShardClientUtil.shardIdForGuildId(data.guild_id, this.client.shard.count));
+        const shard = this.client.ws.shards.get((this.client.guilds.cache.get(data.guild_id) ?? await this.client.guilds.fetch(data.guild_id)).shardId);
         if (!shard)
             throw new Error(`Unable to get shard to send voice state update`);
         shard.send(data);
