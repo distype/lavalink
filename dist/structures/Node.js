@@ -1,14 +1,11 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Node = exports.NodeState = void 0;
 const LavalinkManager_1 = require("./LavalinkManager");
 const TypedEmitter_1 = require("../util/TypedEmitter");
 const undici_1 = require("undici");
 const url_1 = require("url");
-const ws_1 = __importDefault(require("ws"));
+const ws_1 = require("ws");
 /**
  * A {@link Node node}'s state.
  */
@@ -127,7 +124,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
             'Client-Name': this.options.clientName
         };
         if (this.options.resumeKey)
-            headers.set(`Resume-Key`, this.options.resumeKey);
+            headers[`Resume-Key`] = this.options.resumeKey;
         return await new Promise((resolve, reject) => {
             const timedOut = setTimeout(() => {
                 const error = new Error(`Timed out while connecting to the lavalink server`);
@@ -136,7 +133,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
                 });
                 reject(error);
             }, this.options.connectionTimeout);
-            this._ws = new ws_1.default(`ws${this.options.secure ? `s` : ``}://${this.options.host}:${this.options.port}/`, { headers: headers.raw() });
+            this._ws = new ws_1.WebSocket(`ws${this.options.secure ? `s` : ``}://${this.options.host}:${this.options.port}/`, { headers });
             if (this.state !== NodeState.RECONNECTING)
                 this.state = NodeState.CONNECTING;
             this._ws.once(`error`, (error) => {
