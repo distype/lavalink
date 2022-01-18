@@ -6,7 +6,7 @@ import { TypedEmitter } from '../util/TypedEmitter';
 
 import { Dispatcher, request } from 'undici';
 import { URLSearchParams } from 'url';
-import WebSocket from 'ws';
+import { WebSocket } from 'ws';
 
 /**
  * {@link Node} events.
@@ -285,7 +285,7 @@ export class Node extends TypedEmitter<NodeEvents> {
             'User-Id': this.manager.adapter.getBotId(),
             'Client-Name': this.options.clientName
         };
-        if (this.options.resumeKey) headers.set(`Resume-Key`, this.options.resumeKey);
+        if (this.options.resumeKey) headers[`Resume-Key`] = this.options.resumeKey;
 
         return await new Promise((resolve, reject) => {
             const timedOut = setTimeout(() => {
@@ -296,7 +296,7 @@ export class Node extends TypedEmitter<NodeEvents> {
                 reject(error);
             }, this.options.connectionTimeout);
 
-            this._ws = new WebSocket(`ws${this.options.secure ? `s` : ``}://${this.options.host}:${this.options.port}/`, { headers: headers.raw() });
+            this._ws = new WebSocket(`ws${this.options.secure ? `s` : ``}://${this.options.host}:${this.options.port}/`, { headers });
             if (this.state !== NodeState.RECONNECTING) this.state = NodeState.CONNECTING;
 
             this._ws.once(`error`, (error) => {
