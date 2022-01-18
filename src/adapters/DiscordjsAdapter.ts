@@ -60,13 +60,8 @@ export class DiscordjsAdapter extends BaseAdapter {
     }
 
     public async updateVoiceState (data: GatewayVoiceStateUpdateData): Promise<void> {
-        // @ts-expect-error Cannot find module 'discord.js' or its corresponding type declarations.
-        const { ShardClientUtil } = await import(`discord.js`);
-
-        if (typeof this.client.shard?.count !== `number`) throw new Error(`Unable to get shard count`);
-        const shard = this.client.ws.shards.get(ShardClientUtil.shardIdForGuildId(data.guild_id, this.client.shard.count));
+        const shard = this.client.ws.shards.get((this.client.guilds.cache.get(data.guild_id) ?? await this.client.guilds.fetch(data.guild_id)).shardId);
         if (!shard) throw new Error(`Unable to get shard to send voice state update`);
-
         shard.send(data);
     }
 }
