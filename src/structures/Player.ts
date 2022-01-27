@@ -337,7 +337,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
             const onConnect: () => Promise<void> = async () => {
                 this.removeListener(`DESTROYED`, onDestroy);
                 if (this.options.becomeSpeaker) {
-                    if (this.manager.adapter.isStage(this.options.voiceChannelId)) {
+                    if (await this.manager.adapter.isStage(this.options.voiceChannelId)) {
                         this.isStage = true;
                         this.isSpeaker = false;
                         const permissions = await this.manager.adapter.hasPerms(this.options.guildId, this.options.voiceChannelId);
