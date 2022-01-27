@@ -2,7 +2,7 @@ import { BaseAdapter, Permissions } from './BaseAdapter';
 
 import { LavalinkManager } from '../typings/lib';
 
-import { GatewayVoiceStateUpdateData, RESTPatchAPIGuildVoiceStateCurrentMemberJSONBody, Snowflake } from 'discord-api-types/v9';
+import { GatewayOpcodes, GatewayVoiceStateUpdateData, RESTPatchAPIGuildVoiceStateCurrentMemberJSONBody, Snowflake } from 'discord-api-types/v9';
 
 export class DiscordjsAdapter extends BaseAdapter {
     constructor (public client: any) {
@@ -62,6 +62,9 @@ export class DiscordjsAdapter extends BaseAdapter {
     public async updateVoiceState (data: GatewayVoiceStateUpdateData): Promise<void> {
         const shard = this.client.ws.shards.get((this.client.guilds.cache.get(data.guild_id) ?? await this.client.guilds.fetch(data.guild_id)).shardId);
         if (!shard) throw new Error(`Unable to get shard to send voice state update`);
-        shard.send(data);
+        shard.send({
+            op: GatewayOpcodes.VoiceStateUpdate,
+            d: data
+        });
     }
 }
