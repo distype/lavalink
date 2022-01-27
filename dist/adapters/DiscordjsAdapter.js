@@ -60,7 +60,10 @@ class DiscordjsAdapter extends BaseAdapter_1.BaseAdapter {
         const shard = this.client.ws.shards.get((this.client.guilds.cache.get(data.guild_id) ?? await this.client.guilds.fetch(data.guild_id)).shardId);
         if (!shard)
             throw new Error(`Unable to get shard to send voice state update`);
-        shard.send(data);
+        shard.send({
+            op: 4 /* VoiceStateUpdate */,
+            d: data
+        });
     }
 }
 exports.DiscordjsAdapter = DiscordjsAdapter;
