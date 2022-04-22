@@ -2,14 +2,13 @@ import { Node as NodeClass, NodeOptions, NodeRequestOptions, NodeState } from '.
 import { Track as TrackClass, TrackPartial as TrackPartialClass } from './Track';
 import { Player as PlayerClass, PlayerOptions } from './Player';
 
-import { BaseAdapter } from '../adapters/BaseAdapter';
 import { TrackData } from '../typings/Lavalink';
 import { Node, Player, Track, TrackPartial } from '../typings/lib';
 import Constants from '../util/Constants';
-import { TypedEmitter } from '../util/TypedEmitter';
 
-import Collection from '@discordjs/collection';
-import { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData, Snowflake } from 'discord-api-types/v9';
+import { ExtendedMap, TypedEmitter } from '@br88c/node-utils';
+import { GatewayVoiceServerUpdateDispatchData, GatewayVoiceStateUpdateDispatchData } from 'discord-api-types/v10';
+import { Client, Snowflake } from 'distype';
 import { request } from 'undici';
 
 export interface CompleteLavalinkManagerOptions {
@@ -47,88 +46,88 @@ export interface CompleteLavalinkManagerOptions {
     defaultSpotifyRequestOptions?: NodeRequestOptions
 }
 
-export interface LavalinkManagerEvents {
+export interface LavalinkManagerEvents extends Record<string, (...args: any[]) => void> {
     /**
      * Emitted when a node connects to it's lavalink server.
      */
-    NODE_CONNECTED: Node
+    NODE_CONNECTED: (node: Node) => void
     /**
      * Emitted when a node is created.
      */
-    NODE_CREATED: Node
+    NODE_CREATED: (node: Node) => void
     /**
      * Emitted when a node is destroyed.
      */
-    NODE_DESTROYED: { node: Node, reason: string }
+    NODE_DESTROYED: (node: Node, reason: string) => void
     /**
      * Emitted when a node disconnects from it's lavalink server.
      */
-    NODE_DISCONNECTED: { node: Node, code: number, reason: string }
+    NODE_DISCONNECTED: (node: Node, code: number, reason: string) => void
     /**
      * Emitted when a node encounters an error.
      */
-    NODE_ERROR: { node: Node, error: Error }
+    NODE_ERROR: (node: Node, error: Error) => void
     /**
      * Emitted when a node receives a payload from it's server.
      */
-    NODE_RAW: { node: Node, payload: any }
+    NODE_RAW: (node: Node, payload: any) => void
     /**
      * Emitted when a node is attempting to reconnect.
      */
-    NODE_RECONNECTING: Node
+    NODE_RECONNECTING: (node: Node) => void
     /**
      * Emitted when a player connects to a VC.
      */
-    PLAYER_CONNECTED: Player
+    PLAYER_CONNECTED: (player: Player) => void
     /**
      * Emitted when a player is created.
      */
-    PLAYER_CREATED: Player
+    PLAYER_CREATED: (player: Player) => void
     /**
      * Emitted when a player is destroyed.
      */
-    PLAYER_DESTROYED: { player: Player, reason: string }
+    PLAYER_DESTROYED: (player: Player, reason: string) => void
     /**
      * Emitted when a player encounters an error.
      */
-    PLAYER_ERROR: { player: Player, error: Error}
+    PLAYER_ERROR: (player: Player, error: Error) => void
     /**
      * Emitted when a player manually moved. This includes the bot joining or leaving a VC.
      * The player is also automatically paused or destroyed when this event is emitted.
      */
-    PLAYER_MOVED: { player: Player, oldChannel: Snowflake | null, newChannel: Snowflake | null }
+    PLAYER_MOVED: (player: Player, oldChannel: Snowflake | null, newChannel: Snowflake | null) => void
     /**
      * Emitted when a player is paused.
      */
-    PLAYER_PAUSED: { player: Player, reason: string }
+    PLAYER_PAUSED: (player: Player, reason: string) => void
     /**
      * Emitted when a player is resumed.
      */
-    PLAYER_RESUMED: { player: Player, reason: string }
+    PLAYER_RESUMED: (player: Player, reason: string) => void
     /**
      * Emitted when the server sends a track end event.
      */
-    PLAYER_TRACK_END: { player: Player, track: Track | null, reason: string }
+    PLAYER_TRACK_END: (player: Player, track: Track | null, reason: string) => void
     /**
      * Emitted when the server sends a track exception event.
      */
-    PLAYER_TRACK_EXCEPTION: { player: Player, track: Track | null, message: string, severity: string, cause: string }
+    PLAYER_TRACK_EXCEPTION: (player: Player, track: Track | null, message: string, severity: string, cause: string) => void
     /**
      * Emitted when the server sends a track start event.
      */
-    PLAYER_TRACK_START: { player: Player, track: Track | null }
+    PLAYER_TRACK_START: (player: Player, track: Track | null) => void
     /**
      * Emitted when the server sends a track stuck event.
      */
-    PLAYER_TRACK_STUCK: { player: Player, track: Track | null, thresholdMs: number }
+    PLAYER_TRACK_STUCK: (player: Player, track: Track | null, thresholdMs: number) => void
     /**
      * Emitted when the lavalink manager authorizes with spotify, or renews it's spotify token.
      */
-    SPOTIFY_AUTHORIZED: { expiresIn: number, token: string }
+    SPOTIFY_AUTHORIZED: (expiresIn: number, token: string) => void
     /**
      * Emitted when there is an error authorizing with spotify.
      */
-    SPOTIFY_AUTH_ERROR: Error
+    SPOTIFY_AUTH_ERROR: (error: Error) => void
 }
 
 export interface LavalinkManagerOptions extends Partial<CompleteLavalinkManagerOptions> {
@@ -175,7 +174,7 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
     /**
      * The manager's nodes.
      */
-    public nodes: Collection<number, Node> = new Collection();
+    public nodes: ExtendedMap<number, Node> = new ExtendedMap();
     /**
      * The manager's options.
      */
@@ -183,7 +182,7 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
     /**
      * The manager's players.
      */
-    public players: Collection<Snowflake, Player> = new Collection();
+    public players: ExtendedMap<Snowflake, Player> = new ExtendedMap();
     /**
      * The manager's spotify token.
      * Set when running LavalinkManager#connectNodes().
@@ -193,13 +192,13 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
     /**
      * Create a lavalink manager.
      * @param options The options to use for the manager.
-     * @param adapter The manager's library adapter.
+     * @param client The manager's client.
      */
-    constructor (options: LavalinkManagerOptions, public adapter: BaseAdapter) {
+    constructor (options: LavalinkManagerOptions, public client: Client) {
         super();
 
         if (!options) throw new TypeError(`Expected options to be defined`);
-        if (!adapter) throw new TypeError(`Expected worker to be defined`);
+        if (!client) throw new TypeError(`Expected client to be defined`);
 
         if (!options.nodeOptions?.length) throw new Error(`At least 1 node must be defined`);
         if (options.enabledSources && options.defaultSource && !options.enabledSources.includes(options.defaultSource)) throw new Error(`Default source must be defined in enabled sources`);
@@ -215,7 +214,8 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
             spotifyAuth: options.spotifyAuth
         };
 
-        adapter.bind(this);
+        this.client.gateway.on(`VOICE_SERVER_UPDATE`, ({ d }) => this._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, d));
+        this.client.gateway.on(`VOICE_STATE_UPDATE`, ({ d }) => this._handleVoiceUpdate(`VOICE_STATE_UPDATE`, d));
     }
 
     /**
@@ -239,9 +239,7 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
             let attempts = 0;
             const tryConnect: () => void = async () => {
                 if (node.options.maxRetrys !== 0 && attempts >= node.options.maxRetrys) {
-                    node.emit(`ERROR`, {
-                        node, error: new Error(`Unable to connect after ${attempts} attempts`)
-                    });
+                    node.emit(`ERROR`, node, new Error(`Unable to connect after ${attempts} attempts`));
                     if (connectInterval) clearInterval(connectInterval);
                     reject(new Error(`Max connect retrys reached`));
                 }
@@ -353,17 +351,17 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
         } else {
             const res = await searchNode.request(`GET`, `/loadtracks`, { query: { identifier: Constants.URL_REGEX.test(query) ? query : `${Constants.SOURCE_IDENTIFIERS[source] as string}search:${query}` } });
 
-            if (!res?.json) throw new Error(`No search response data`);
+            if (!res) throw new Error(`No search response data`);
 
             const searchResult: SearchResult = {
-                loadType: res.json.loadType,
-                tracks: res.json.tracks.map((data: TrackData) => new TrackClass(data, requester)),
-                exception: res.json.exception
+                loadType: res.loadType,
+                tracks: res.tracks.map((data: TrackData) => new TrackClass(data, requester)),
+                exception: res.exception
             };
-            if (res.json.playlistInfo) {
+            if (res.playlistInfo) {
                 searchResult.playlistInfo = {
-                    name: res.json.playlistInfo.Name,
-                    selectedTrack: typeof res.json.playlistInfo.selectedTrack === `number` ? searchResult.tracks[res.json.playlistInfo.selectedTrack] as Track : null
+                    name: res.playlistInfo.Name,
+                    selectedTrack: typeof res.playlistInfo.selectedTrack === `number` ? searchResult.tracks[res.playlistInfo.selectedTrack] as Track : null
                 };
             }
 
@@ -381,8 +379,8 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
         if (!decodeNode) throw new Error(`No available nodes to decode the track`);
 
         const res = await decodeNode.request(`POST`, `/decodetracks`, { body: JSON.stringify(tracks) });
-        if (!res?.json) throw new Error(`No decode response data`);
-        return (res.json as []).map((data: TrackData) => new TrackClass(data, `N/A`));
+        if (!res) throw new Error(`No decode response data`);
+        return (res as []).map((data: TrackData) => new TrackClass(data, `N/A`));
     }
 
     /**
@@ -400,9 +398,9 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
         }
         if (track.length) {
             const sameDuration = search.tracks.filter((t) =>
-                t.length &&
-            (t.length >= ((track.length ?? 0) - 2000)) &&
-            (t.length <= ((track.length ?? 0) + 200))
+                t.length
+                && (t.length >= ((track.length ?? 0) - 2000))
+                && (t.length <= ((track.length ?? 0) + 200))
             ) as Track[];
             if (sameDuration.length) return sameDuration[0];
         }
@@ -415,19 +413,22 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
      * @param data Data from the event.
      * @internal
      */
-    public async _handleVoiceUpdate <T extends `VOICE_SERVER_UPDATE` | `VOICE_STATE_UPDATE`>(event: T, data: T extends `VOICE_SERVER_UPDATE` ? GatewayVoiceServerUpdateDispatchData : GatewayVoiceStateUpdateDispatchData): Promise<void> {
+    public _handleVoiceUpdate <T extends `VOICE_SERVER_UPDATE` | `VOICE_STATE_UPDATE`> (event: T, data: T extends `VOICE_SERVER_UPDATE` ? GatewayVoiceServerUpdateDispatchData : GatewayVoiceStateUpdateDispatchData): void {
         if (!data.guild_id) return;
         const player = this.players.get(data.guild_id);
         if (!player) return;
 
         if (event === `VOICE_STATE_UPDATE`) {
-            if ((data as GatewayVoiceStateUpdateDispatchData).user_id !== this.adapter.getBotId()) return;
+            if ((data as GatewayVoiceStateUpdateDispatchData).user_id !== this.client.gateway.user?.id) return;
             void player._handleMove((data as GatewayVoiceStateUpdateDispatchData).channel_id, data as GatewayVoiceStateUpdateDispatchData);
         } else if (event === `VOICE_SERVER_UPDATE`) {
+            const shard = this.client.gateway.guildShard(player.options.guildId);
+            if (typeof shard === `number`) return;
+
             player.node.send({
                 op: `voiceUpdate`,
                 guildId: player.options.guildId,
-                sessionId: await this.adapter.getGuildShardSessionId(player.options.guildId),
+                sessionId: shard.sessionId,
                 event: data
             }).catch(() => {});
         }
@@ -454,9 +455,7 @@ export class LavalinkManager extends TypedEmitter<LavalinkManagerEvents> {
         const data = await res.body.json();
         if (!data?.access_token) throw new Error(`Invalid Spotify authentication`);
         this.spotifyToken = `Bearer ${data.access_token as string}`;
-        this.emit(`SPOTIFY_AUTHORIZED`, {
-            expiresIn: data.expires_in * 1000, token: this.spotifyToken
-        });
+        this.emit(`SPOTIFY_AUTHORIZED`, data.expires_in * 1000, this.spotifyToken);
         return data.expires_in * 1000;
     }
 

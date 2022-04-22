@@ -2,44 +2,44 @@ import { LavalinkManager as LavalinkManagerClass } from './LavalinkManager';
 
 import { NodeStats } from '../typings/Lavalink';
 import { LavalinkManager } from '../typings/lib';
-import { TypedEmitter } from '../util/TypedEmitter';
 
-import { Dispatcher, request } from 'undici';
+import { TypedEmitter } from '@br88c/node-utils';
+import { request } from 'undici';
 import { URLSearchParams } from 'url';
 import { WebSocket } from 'ws';
 
 /**
  * {@link Node} events.
  */
-export interface NodeEvents {
+export interface NodeEvents extends Record<string, (...args: any[]) => void> {
     /**
      * Emitted when the node connects to the lavalink server.
      */
-    CONNECTED: Node
+    CONNECTED: (node: Node) => void
     /**
      * Emitted when the node is created.
      */
-    CREATED: Node
+    CREATED: (node: Node) => void
     /**
      * Emitted when the node is destroyed.
      */
-    DESTROYED: { node: Node, reason: string }
+    DESTROYED: (node: Node, reason: string) => void
     /**
      * Emitted when the node disconnects from the lavalink server.
      */
-    DISCONNECTED: { node: Node, code: number, reason: string }
+    DISCONNECTED: (node: Node, code: number, reason: string) => void
     /**
      * Emitted when the node encounters an error.
      */
-    ERROR: { node: Node, error: Error }
+    ERROR: (node: Node, error: Error) => void
     /**
      * Emitted when the node receives a payload from the server.
      */
-    RAW: { node: Node, payload: any }
+    RAW: (node: Node, raw: any) => void
     /**
      * Emitted when the node is attempting to reconnect.
      */
-    RECONNECTING: Node
+    RECONNECTING: (node: Node) => void
 }
 
 /**
@@ -199,12 +199,10 @@ export class Node extends TypedEmitter<NodeEvents> {
     /**
      * The node's ID.
      */
-    // @ts-expect-error Property 'id' has no initializer and is not definitely assigned in the constructor.
     public readonly id: number;
     /**
      * The node's {@link NodeOptionsComplete options}.
      */
-    // @ts-expect-error Property 'options' has no initializer and is not definitely assigned in the constructor.
     public readonly options: NodeOptionsComplete;
 
     /**
@@ -232,44 +230,32 @@ export class Node extends TypedEmitter<NodeEvents> {
         if (typeof id !== `number`) throw new TypeError(`A node ID must be specified`);
         if (!(manager instanceof LavalinkManagerClass)) throw new TypeError(`A manager must be specified`);
 
-        Object.defineProperty(this, `id`, {
-            configurable: false,
-            enumerable: false,
-            value: id as Node[`id`],
-            writable: false
-        });
-        Object.defineProperty(this, `options`, {
-            configurable: false,
-            enumerable: true,
-            value: Object.freeze({
-                host: options.host ?? `localhost`,
-                port: options.port ?? 2333,
-                password: options.password ?? `youshallnotpass`,
-                secure: options.secure ?? false,
-                resumeKey: options.resumeKey,
-                resumeKeyConfig: options.resumeKeyConfig,
-                clientName: options.clientName ?? `rose-lavalink`,
-                connectionTimeout: options.connectionTimeout ?? 15000,
-                requestTimeout: options.requestTimeout ?? 15000,
-                maxRetrys: options.maxRetrys ?? 10,
-                retryDelay: options.retryDelay ?? 15000,
-                defaultRequestOptions: options.defaultRequestOptions ?? {}
-            }) as Node[`options`],
-            writable: false
-        });
-
+        this.id = id;
         this.manager = manager;
+        this.options = {
+            host: options.host ?? `localhost`,
+            port: options.port ?? 2333,
+            password: options.password ?? `youshallnotpass`,
+            secure: options.secure ?? false,
+            resumeKey: options.resumeKey,
+            resumeKeyConfig: options.resumeKeyConfig,
+            clientName: options.clientName ?? `rose-lavalink`,
+            connectionTimeout: options.connectionTimeout ?? 15000,
+            requestTimeout: options.requestTimeout ?? 15000,
+            maxRetrys: options.maxRetrys ?? 10,
+            retryDelay: options.retryDelay ?? 15000,
+            defaultRequestOptions: options.defaultRequestOptions ?? {}
+        };
 
-        // @ts-expect-error Property 'options' is used before being assigned.
         if (this.options.connectionTimeout > this.options.retryDelay) throw new Error(`Node connection timeout must be greater than the reconnect retry delay`);
 
-        this.on(`CONNECTED`, (data) => this.manager.emit(`NODE_CONNECTED`, data));
-        this.on(`CREATED`, (data) => this.manager.emit(`NODE_CREATED`, data));
-        this.on(`DESTROYED`, (data) => this.manager.emit(`NODE_DESTROYED`, data));
-        this.on(`DISCONNECTED`, (data) => this.manager.emit(`NODE_DISCONNECTED`, data));
-        this.on(`ERROR`, (data) => this.manager.emit(`NODE_ERROR`, data));
-        this.on(`RAW`, (data) => this.manager.emit(`NODE_RAW`, data));
-        this.on(`RECONNECTING`, (data) => this.manager.emit(`NODE_RECONNECTING`, data));
+        this.on(`CONNECTED`, (...data) => this.manager.emit(`NODE_CONNECTED`, ...data));
+        this.on(`CREATED`, (...data) => this.manager.emit(`NODE_CREATED`, ...data));
+        this.on(`DESTROYED`, (...data) => this.manager.emit(`NODE_DESTROYED`, ...data));
+        this.on(`DISCONNECTED`, (...data) => this.manager.emit(`NODE_DISCONNECTED`, ...data));
+        this.on(`ERROR`, (...data) => this.manager.emit(`NODE_ERROR`, ...data));
+        this.on(`RAW`, (...data) => this.manager.emit(`NODE_RAW`, ...data));
+        this.on(`RECONNECTING`, (...data) => this.manager.emit(`NODE_RECONNECTING`, ...data));
 
         this.emit(`CREATED`, this);
     }
@@ -282,7 +268,7 @@ export class Node extends TypedEmitter<NodeEvents> {
 
         const headers: Record<string, any> = {
             'Authorization': this.options.password,
-            'User-Id': this.manager.adapter.getBotId(),
+            'User-Id': this.manager.client.gateway.user?.id,
             'Client-Name': this.options.clientName
         };
         if (this.options.resumeKey) headers[`Resume-Key`] = this.options.resumeKey;
@@ -290,9 +276,7 @@ export class Node extends TypedEmitter<NodeEvents> {
         return await new Promise((resolve, reject) => {
             const timedOut = setTimeout(() => {
                 const error = new Error(`Timed out while connecting to the lavalink server`);
-                this.emit(`ERROR`, {
-                    node: this, error
-                });
+                this.emit(`ERROR`, this, error);
                 reject(error);
             }, this.options.connectionTimeout);
 
@@ -346,9 +330,7 @@ export class Node extends TypedEmitter<NodeEvents> {
         this.manager.players.filter((player) => player.node.id === this.id).forEach((player) => player.destroy(`Attached node destroyed`));
 
         this.state = NodeState.DESTROYED;
-        this.emit(`DESTROYED`, {
-            node: this, reason
-        });
+        this.emit(`DESTROYED`, this, reason);
         this.removeAllListeners();
 
         this.manager.nodes.delete(this.id);
@@ -363,9 +345,7 @@ export class Node extends TypedEmitter<NodeEvents> {
         return await new Promise((resolve, reject) => {
             this._ws?.send(JSON.stringify(msg), (error) => {
                 if (error) {
-                    this.emit(`ERROR`, {
-                        node: this, error
-                    });
+                    this.emit(`ERROR`, this, error);
                     reject(error);
                 } else resolve(true);
             });
@@ -379,7 +359,7 @@ export class Node extends TypedEmitter<NodeEvents> {
      * @param options Request options.
      * @returns The response from the server.
      */
-    public async request (method: NodeRequestMethods, route: string, options: NodeRequestOptions = {}): Promise<{ res: Dispatcher.ResponseData, json: any }> {
+    public async request (method: NodeRequestMethods, route: string, options: NodeRequestOptions = {}): Promise<any> {
         const headers: Record<string, any> = {
             ...this.options.defaultRequestOptions.headers,
             ...options.headers,
@@ -396,9 +376,7 @@ export class Node extends TypedEmitter<NodeEvents> {
             bodyTimeout: options.timeout ?? this.options.defaultRequestOptions.timeout
         });
 
-        return {
-            res, json: res.statusCode === 204 ? null : await res.body.json()
-        };
+        return res.statusCode === 204 ? null : await res.body.json().catch(() => null);
     }
 
     /**
@@ -408,9 +386,7 @@ export class Node extends TypedEmitter<NodeEvents> {
         this.state = NodeState.RECONNECTING;
         this._reconnectTimeout = setInterval(() => {
             if (this.options.maxRetrys !== 0 && this._reconnectAttempts >= this.options.maxRetrys) {
-                this.emit(`ERROR`, {
-                    node: this, error: new Error(`Unable to reconnect after ${this._reconnectAttempts} attempts.`)
-                });
+                this.emit(`ERROR`, this, new Error(`Unable to reconnect after ${this._reconnectAttempts} attempts.`));
                 return this.destroy();
             }
             this._ws?.removeAllListeners();
@@ -440,9 +416,7 @@ export class Node extends TypedEmitter<NodeEvents> {
      */
     private _onClose (code: number, reason: string): void {
         this.state = NodeState.DISCONNECTED;
-        this.emit(`DISCONNECTED`, {
-            node: this, code, reason: reason.length ? reason : `No reason specified`
-        });
+        this.emit(`DISCONNECTED`, this, code, reason.length ? reason : `No reason specified`);
         if (code !== 1000 && reason !== `destroy`) this._reconnect();
     }
 
@@ -452,9 +426,7 @@ export class Node extends TypedEmitter<NodeEvents> {
      */
     private _onError (error: Error): void {
         if (!error) return;
-        this.emit(`ERROR`, {
-            node: this, error
-        });
+        this.emit(`ERROR`, this, error);
     }
 
     /**
@@ -465,9 +437,7 @@ export class Node extends TypedEmitter<NodeEvents> {
         if (Array.isArray(data)) data = Buffer.concat(data);
         else if (data instanceof ArrayBuffer) data = Buffer.from(data);
         const payload = JSON.parse(data.toString());
-        this.emit(`RAW`, {
-            node: this, payload
-        });
+        this.emit(`RAW`, this, payload);
 
         switch (payload.op) {
             case `event`:
@@ -480,9 +450,7 @@ export class Node extends TypedEmitter<NodeEvents> {
                 break;
             }
             default: {
-                this.emit(`ERROR`, {
-                    node: this, error: new Error(`Received unexpected op "${payload.op as string | number}"`)
-                });
+                this.emit(`ERROR`, this, new Error(`Received unexpected op "${payload.op as string | number}"`));
                 break;
             }
         }

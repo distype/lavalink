@@ -1,6 +1,7 @@
 <div align="center">
     <br>
     <h1>@distype/lavalink</h1>
+    <br><br>
     <p>
         <a href="https://www.npmjs.com/package/@distype/lavalink"><img src="https://img.shields.io/npm/v/@distype/lavalink.svg?color=5162F&style=for-the-badge&logo=npm"></a>
         <a href="https://github.com/distype/lavalink/actions/workflows/build.yml"><img src="https://img.shields.io/github/workflow/status/distype/lavalink/Build?style=for-the-badge&logo=github"><a>
@@ -12,6 +13,12 @@
 ## About
 
 A [lavalink](https://github.com/freyacodes/Lavalink) wrapper with native bindings to Distype, as well as other JavaScript and TypeScript Discord libraries. This library is current tested and developed for [lavalink `v3.4`](https://github.com/freyacodes/Lavalink/releases/tag/3.4), using Java 13.
+
+### Links
+
+- [Docs](https://distypelavalink.br88c.dev/)
+- [NPM](https://www.npmjs.com/package/@distype/lavalink)
+- [GitHub](https://github.com/distype/lavalink)
 
 ## HTTP and WebSocket client used
 

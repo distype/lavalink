@@ -2,7 +2,8 @@
   "out": "./docs/",
   "entryPoints": ["src/index.ts"],
   "readme": "./README.md",
-  "name": "@distype/lavalink",
+  "name": "distype",
+  "cname": "distype.br88c.dev",
   "includeVersion": true,
   "excludePrivate": true,
   "theme": "default"
