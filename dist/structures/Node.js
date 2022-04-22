@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Node = exports.NodeState = void 0;
 const LavalinkManager_1 = require("./LavalinkManager");
-const TypedEmitter_1 = require("../util/TypedEmitter");
+const node_utils_1 = require("@br88c/node-utils");
 const undici_1 = require("undici");
 const url_1 = require("url");
 const ws_1 = require("ws");
@@ -21,7 +21,7 @@ var NodeState;
  * A lavalink node.
  * Communicates with a lavalink server.
  */
-class Node extends TypedEmitter_1.TypedEmitter {
+class Node extends node_utils_1.TypedEmitter {
     /**
      * Create a node.
      * @param id The node's ID.
@@ -74,42 +74,31 @@ class Node extends TypedEmitter_1.TypedEmitter {
             throw new TypeError(`A node ID must be specified`);
         if (!(manager instanceof LavalinkManager_1.LavalinkManager))
             throw new TypeError(`A manager must be specified`);
-        Object.defineProperty(this, `id`, {
-            configurable: false,
-            enumerable: false,
-            value: id,
-            writable: false
-        });
-        Object.defineProperty(this, `options`, {
-            configurable: false,
-            enumerable: true,
-            value: Object.freeze({
-                host: options.host ?? `localhost`,
-                port: options.port ?? 2333,
-                password: options.password ?? `youshallnotpass`,
-                secure: options.secure ?? false,
-                resumeKey: options.resumeKey,
-                resumeKeyConfig: options.resumeKeyConfig,
-                clientName: options.clientName ?? `rose-lavalink`,
-                connectionTimeout: options.connectionTimeout ?? 15000,
-                requestTimeout: options.requestTimeout ?? 15000,
-                maxRetrys: options.maxRetrys ?? 10,
-                retryDelay: options.retryDelay ?? 15000,
-                defaultRequestOptions: options.defaultRequestOptions ?? {}
-            }),
-            writable: false
-        });
+        this.id = id;
         this.manager = manager;
-        // @ts-expect-error Property 'options' is used before being assigned.
+        this.options = {
+            host: options.host ?? `localhost`,
+            port: options.port ?? 2333,
+            password: options.password ?? `youshallnotpass`,
+            secure: options.secure ?? false,
+            resumeKey: options.resumeKey,
+            resumeKeyConfig: options.resumeKeyConfig,
+            clientName: options.clientName ?? `rose-lavalink`,
+            connectionTimeout: options.connectionTimeout ?? 15000,
+            requestTimeout: options.requestTimeout ?? 15000,
+            maxRetrys: options.maxRetrys ?? 10,
+            retryDelay: options.retryDelay ?? 15000,
+            defaultRequestOptions: options.defaultRequestOptions ?? {}
+        };
         if (this.options.connectionTimeout > this.options.retryDelay)
             throw new Error(`Node connection timeout must be greater than the reconnect retry delay`);
-        this.on(`CONNECTED`, (data) => this.manager.emit(`NODE_CONNECTED`, data));
-        this.on(`CREATED`, (data) => this.manager.emit(`NODE_CREATED`, data));
-        this.on(`DESTROYED`, (data) => this.manager.emit(`NODE_DESTROYED`, data));
-        this.on(`DISCONNECTED`, (data) => this.manager.emit(`NODE_DISCONNECTED`, data));
-        this.on(`ERROR`, (data) => this.manager.emit(`NODE_ERROR`, data));
-        this.on(`RAW`, (data) => this.manager.emit(`NODE_RAW`, data));
-        this.on(`RECONNECTING`, (data) => this.manager.emit(`NODE_RECONNECTING`, data));
+        this.on(`CONNECTED`, (...data) => this.manager.emit(`NODE_CONNECTED`, ...data));
+        this.on(`CREATED`, (...data) => this.manager.emit(`NODE_CREATED`, ...data));
+        this.on(`DESTROYED`, (...data) => this.manager.emit(`NODE_DESTROYED`, ...data));
+        this.on(`DISCONNECTED`, (...data) => this.manager.emit(`NODE_DISCONNECTED`, ...data));
+        this.on(`ERROR`, (...data) => this.manager.emit(`NODE_ERROR`, ...data));
+        this.on(`RAW`, (...data) => this.manager.emit(`NODE_RAW`, ...data));
+        this.on(`RECONNECTING`, (...data) => this.manager.emit(`NODE_RECONNECTING`, ...data));
         this.emit(`CREATED`, this);
     }
     /**
@@ -120,7 +109,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
             throw new Error(`Cannot initiate a connection when the node isn't in a disconnected or reconnecting state`);
         const headers = {
             'Authorization': this.options.password,
-            'User-Id': this.manager.adapter.getBotId(),
+            'User-Id': this.manager.client.gateway.user?.id,
             'Client-Name': this.options.clientName
         };
         if (this.options.resumeKey)
@@ -128,9 +117,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
         return await new Promise((resolve, reject) => {
             const timedOut = setTimeout(() => {
                 const error = new Error(`Timed out while connecting to the lavalink server`);
-                this.emit(`ERROR`, {
-                    node: this, error
-                });
+                this.emit(`ERROR`, this, error);
                 reject(error);
             }, this.options.connectionTimeout);
             this._ws = new ws_1.WebSocket(`ws${this.options.secure ? `s` : ``}://${this.options.host}:${this.options.port}/`, { headers });
@@ -181,9 +168,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
         }
         this.manager.players.filter((player) => player.node.id === this.id).forEach((player) => player.destroy(`Attached node destroyed`));
         this.state = NodeState.DESTROYED;
-        this.emit(`DESTROYED`, {
-            node: this, reason
-        });
+        this.emit(`DESTROYED`, this, reason);
         this.removeAllListeners();
         this.manager.nodes.delete(this.id);
     }
@@ -197,9 +182,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
         return await new Promise((resolve, reject) => {
             this._ws?.send(JSON.stringify(msg), (error) => {
                 if (error) {
-                    this.emit(`ERROR`, {
-                        node: this, error
-                    });
+                    this.emit(`ERROR`, this, error);
                     reject(error);
                 }
                 else
@@ -230,9 +213,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
             body: JSON.stringify(options.body),
             bodyTimeout: options.timeout ?? this.options.defaultRequestOptions.timeout
         });
-        return {
-            res, json: res.statusCode === 204 ? null : await res.body.json()
-        };
+        return res.statusCode === 204 ? null : await res.body.json().catch(() => null);
     }
     /**
      * Attempt to reconnect the node to the server.
@@ -241,9 +222,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
         this.state = NodeState.RECONNECTING;
         this._reconnectTimeout = setInterval(() => {
             if (this.options.maxRetrys !== 0 && this._reconnectAttempts >= this.options.maxRetrys) {
-                this.emit(`ERROR`, {
-                    node: this, error: new Error(`Unable to reconnect after ${this._reconnectAttempts} attempts.`)
-                });
+                this.emit(`ERROR`, this, new Error(`Unable to reconnect after ${this._reconnectAttempts} attempts.`));
                 return this.destroy();
             }
             this._ws?.removeAllListeners();
@@ -271,9 +250,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
      */
     _onClose(code, reason) {
         this.state = NodeState.DISCONNECTED;
-        this.emit(`DISCONNECTED`, {
-            node: this, code, reason: reason.length ? reason : `No reason specified`
-        });
+        this.emit(`DISCONNECTED`, this, code, reason.length ? reason : `No reason specified`);
         if (code !== 1000 && reason !== `destroy`)
             this._reconnect();
     }
@@ -284,9 +261,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
     _onError(error) {
         if (!error)
             return;
-        this.emit(`ERROR`, {
-            node: this, error
-        });
+        this.emit(`ERROR`, this, error);
     }
     /**
      * Fired when the websocket receives a message payload
@@ -298,9 +273,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
         else if (data instanceof ArrayBuffer)
             data = Buffer.from(data);
         const payload = JSON.parse(data.toString());
-        this.emit(`RAW`, {
-            node: this, payload
-        });
+        this.emit(`RAW`, this, payload);
         switch (payload.op) {
             case `event`:
             case `playerUpdate`: {
@@ -312,9 +285,7 @@ class Node extends TypedEmitter_1.TypedEmitter {
                 break;
             }
             default: {
-                this.emit(`ERROR`, {
-                    node: this, error: new Error(`Received unexpected op "${payload.op}"`)
-                });
+                this.emit(`ERROR`, this, new Error(`Received unexpected op "${payload.op}"`));
                 break;
             }
         }

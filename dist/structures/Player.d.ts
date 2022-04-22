@@ -1,90 +1,56 @@
-import { Permissions } from '../adapters/BaseAdapter';
 import { Filters } from '../typings/Lavalink';
 import { LavalinkManager, Node, Track, TrackPartial } from '../typings/lib';
-import { TypedEmitter } from '../util/TypedEmitter';
-import { GatewayVoiceStateUpdateDispatchData, Snowflake } from 'discord-api-types/v9';
+import { TypedEmitter } from '@br88c/node-utils';
+import { GatewayVoiceStateUpdateDispatchData, Snowflake } from 'discord-api-types/v10';
 /**
  * {@link Player} events.
  */
-export interface PlayerEvents {
+export interface PlayerEvents extends Record<string, (...args: any[]) => void> {
     /**
      * Emitted when the player connects to a VC.
      */
-    CONNECTED: Player;
+    CONNECTED: (player: Player) => void;
     /**
      * Emitted when the player is created.
      */
-    CREATED: Player;
+    CREATED: (player: Player) => void;
     /**
      * Emitted when the player is destroyed.
      */
-    DESTROYED: {
-        player: Player;
-        reason: string;
-    };
+    DESTROYED: (player: Player, reason: string) => void;
     /**
      * Emitted when the player encounters an error.
      */
-    ERROR: {
-        player: Player;
-        error: Error;
-    };
+    ERROR: (player: Player, error: Error) => void;
     /**
      * Emitted when the player manually moved. This includes the bot joining or leaving a VC.
      * The player is also automatically paused or destroyed when this event is emitted.
      */
-    MOVED: {
-        player: Player;
-        oldChannel: Snowflake | null;
-        newChannel: Snowflake | null;
-    };
+    MOVED: (player: Player, oldChannel: Snowflake | null, newChannel: Snowflake | null) => void;
     /**
      * Emitted when the player is paused.
      */
-    PAUSED: {
-        player: Player;
-        reason: string;
-    };
+    PAUSED: (player: Player, reason: string) => void;
     /**
      * Emitted when the player is resumed.
      */
-    RESUMED: {
-        player: Player;
-        reason: string;
-    };
+    RESUMED: (player: Player, reason: string) => void;
     /**
      * Emitted when the server sends a track end event.
      */
-    TRACK_END: {
-        player: Player;
-        track: Track | null;
-        reason: string;
-    };
+    TRACK_END: (player: Player, track: Track | null, reason: string) => void;
     /**
      * Emitted when the server sends a track exception event.
      */
-    TRACK_EXCEPTION: {
-        player: Player;
-        track: Track | null;
-        message: string;
-        severity: string;
-        cause: string;
-    };
+    TRACK_EXCEPTION: (player: Player, track: Track | null, message: string, severity: string, cause: string) => void;
     /**
      * Emitted when the server sends a track start event.
      */
-    TRACK_START: {
-        player: Player;
-        track: Track | null;
-    };
+    TRACK_START: (player: Player, track: Track | null) => void;
     /**
      * Emitted when the server sends a track stuck event.
      */
-    TRACK_STUCK: {
-        player: Player;
-        track: Track | null;
-        thresholdMs: number;
-    };
+    TRACK_STUCK: (player: Player, track: Track | null, thresholdMs: number) => void;
 }
 /**
  * A {@link Player player}'s loop type.
@@ -267,14 +233,6 @@ export declare class Player extends TypedEmitter<PlayerEvents> {
      */
     get currentTrack(): Track | TrackPartial | null;
     /**
-     * Checks if the bot has necessary permissions. Usefull for preventing `403` errors from Discord, and should be ran before using `Player#connect()`.
-     * Returns missing permissions. Ignores stage permissions if `Player#options#becomeSpeaker` is false.
-     */
-    checkPermissions(): Promise<{
-        text: Array<keyof Permissions>;
-        voice: Array<keyof Permissions>;
-    }>;
-    /**
      * Connect to a voice channel.
      * The player must be in a disconnected state.
      */
@@ -352,7 +310,7 @@ export declare class Player extends TypedEmitter<PlayerEvents> {
      * @param data [Voice state update](https://discord.com/developers/docs/topics/gateway#voice-state-update) data.
      * @internal
      */
-    _handleMove(newChannel: Snowflake | null, data: GatewayVoiceStateUpdateDispatchData): Promise<void>;
+    _handleMove(newChannel: Snowflake | null, data: GatewayVoiceStateUpdateDispatchData): void;
     /**
      * Advance the queue.
      */

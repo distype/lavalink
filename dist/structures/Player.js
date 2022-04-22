@@ -1,12 +1,9 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Player = exports.PlayerState = void 0;
 const Track_1 = require("./Track");
-const Constants_1 = __importDefault(require("../util/Constants"));
-const TypedEmitter_1 = require("../util/TypedEmitter");
+const node_utils_1 = require("@br88c/node-utils");
+const v10_1 = require("discord-api-types/v10");
 /**
  * A {@link Player player}'s state.
  */
@@ -23,7 +20,7 @@ var PlayerState;
  * A player.
  * Manages a persistent queue, as well as voice state changes, stage channels, permissions, etc.
  */
-class Player extends TypedEmitter_1.TypedEmitter {
+class Player extends node_utils_1.TypedEmitter {
     /**
      * Create a player.
      * @param options The {@link PlayerOptions options} to use for the player.
@@ -110,15 +107,15 @@ class Player extends TypedEmitter_1.TypedEmitter {
             stageMoveBehavior: options.stageMoveBehavior ?? `pause`
         };
         this.node.on(`RAW`, this._handlePayload.bind(this));
-        this.on(`CONNECTED`, (data) => this.manager.emit(`PLAYER_CONNECTED`, data));
-        this.on(`CREATED`, (data) => this.manager.emit(`PLAYER_CREATED`, data));
-        this.on(`DESTROYED`, (data) => this.manager.emit(`PLAYER_DESTROYED`, data));
-        this.on(`ERROR`, (data) => this.manager.emit(`PLAYER_ERROR`, data));
-        this.on(`MOVED`, (data) => this.manager.emit(`PLAYER_MOVED`, data));
-        this.on(`TRACK_END`, (data) => this.manager.emit(`PLAYER_TRACK_END`, data));
-        this.on(`TRACK_EXCEPTION`, (data) => this.manager.emit(`PLAYER_TRACK_EXCEPTION`, data));
-        this.on(`TRACK_START`, (data) => this.manager.emit(`PLAYER_TRACK_START`, data));
-        this.on(`TRACK_STUCK`, (data) => this.manager.emit(`PLAYER_TRACK_STUCK`, data));
+        this.on(`CONNECTED`, (...data) => this.manager.emit(`PLAYER_CONNECTED`, ...data));
+        this.on(`CREATED`, (...data) => this.manager.emit(`PLAYER_CREATED`, ...data));
+        this.on(`DESTROYED`, (...data) => this.manager.emit(`PLAYER_DESTROYED`, ...data));
+        this.on(`ERROR`, (...data) => this.manager.emit(`PLAYER_ERROR`, ...data));
+        this.on(`MOVED`, (...data) => this.manager.emit(`PLAYER_MOVED`, ...data));
+        this.on(`TRACK_END`, (...data) => this.manager.emit(`PLAYER_TRACK_END`, ...data));
+        this.on(`TRACK_EXCEPTION`, (...data) => this.manager.emit(`PLAYER_TRACK_EXCEPTION`, ...data));
+        this.on(`TRACK_START`, (...data) => this.manager.emit(`PLAYER_TRACK_START`, ...data));
+        this.on(`TRACK_STUCK`, (...data) => this.manager.emit(`PLAYER_TRACK_STUCK`, ...data));
         this.emit(`CREATED`, this);
     }
     /**
@@ -140,67 +137,34 @@ class Player extends TypedEmitter_1.TypedEmitter {
         return this.queuePosition !== null ? this.queue[this.queuePosition] : null;
     }
     /**
-     * Checks if the bot has necessary permissions. Usefull for preventing `403` errors from Discord, and should be ran before using `Player#connect()`.
-     * Returns missing permissions. Ignores stage permissions if `Player#options#becomeSpeaker` is false.
-     */
-    async checkPermissions() {
-        const text = await this.manager.adapter.hasPerms(this.options.guildId, this.options.textChannelId);
-        const voice = await this.manager.adapter.hasPerms(this.options.guildId, this.options.voiceChannelId);
-        return {
-            text: Object.keys(text)
-                .filter((perm) => Constants_1.default.TEXT_REQUIRED_PERMISSIONS.includes(perm) && !text[perm]),
-            voice: Object.keys(voice)
-                .filter((perm) => (Constants_1.default.VOICE_REQUIRED_PERMISSIONS.concat(this.options.becomeSpeaker ? [`MUTE_MEMEBERS`, `REQUEST_TO_SPEAK`] : [])).includes(perm) && !text[perm])
-                .filter((perm, _, perms) => (perm === `MUTE_MEMBERS` || perm === `REQUEST_TO_SPEAK`) ? (!perms.includes(`MUTE_MEMBERS`) && !perms.includes(`REQUEST_TO_SPEAK`)) : true)
-        };
-    }
-    /**
      * Connect to a voice channel.
      * The player must be in a disconnected state.
      */
     async connect() {
         if (this.state !== PlayerState.DISCONNECTED)
             throw new Error(`Cannot initiate a connection when the player isn't in a disconnected state`);
-        void this.manager.adapter.updateVoiceState({
-            guild_id: this.options.guildId,
-            channel_id: this.options.voiceChannelId,
-            self_mute: this.options.selfMute,
-            self_deaf: this.options.selfDeafen
-        });
+        void this.manager.client.gateway.updateVoiceState(this.options.guildId, this.options.voiceChannelId, false, true);
         this.state = PlayerState.CONNECTING;
         return await new Promise((resolve, reject) => {
             const timedOut = setTimeout(() => {
                 const error = new Error(`Timed out while connecting to the voice channel`);
-                this.emit(`ERROR`, {
-                    player: this, error
-                });
+                this.emit(`ERROR`, this, error);
                 reject(error);
             }, this.options.connectionTimeout);
             const onConnect = async () => {
                 this.removeListener(`DESTROYED`, onDestroy);
                 if (this.options.becomeSpeaker) {
-                    if (await this.manager.adapter.isStage(this.options.voiceChannelId)) {
+                    if ((await this.manager.client.getChannelData(this.options.voiceChannelId, `type`)) === v10_1.ChannelType.GuildStageVoice) {
                         this.isStage = true;
                         this.isSpeaker = false;
-                        const permissions = await this.manager.adapter.hasPerms(this.options.guildId, this.options.voiceChannelId);
-                        if (permissions.MUTE_MEMBERS) {
-                            await this.manager.adapter.modifyCurrentUserVoiceState(this.options.guildId, {
-                                channel_id: this.options.voiceChannelId, suppress: false
-                            });
-                            this.isSpeaker = true;
-                        }
-                        else if (permissions.REQUEST_TO_SPEAK) {
-                            await this.manager.adapter.modifyCurrentUserVoiceState(this.options.guildId, {
-                                channel_id: this.options.voiceChannelId, request_to_speak_timestamp: new Date().toISOString()
-                            });
+                        if (!this) {
+                            // todo check permissions
                         }
                         else {
                             if (this.currentVoiceChannel)
                                 void this._disconnect();
                             const error = new Error(`Failed to connect to the stage channel, the bot does not have permissions to request to or become a speaker`);
-                            this.emit(`ERROR`, {
-                                player: this, error
-                            });
+                            this.emit(`ERROR`, this, error);
                             if (timedOut)
                                 clearTimeout(timedOut);
                             reject(error);
@@ -213,14 +177,12 @@ class Player extends TypedEmitter_1.TypedEmitter {
                     clearTimeout(timedOut);
                 resolve(undefined);
             };
-            const onDestroy = (data) => {
+            const onDestroy = (_, reason) => {
                 this.removeListener(`CONNECTED`, onConnect);
                 if (this.currentVoiceChannel)
                     void this._disconnect();
-                const error = new Error(`Failed to connect to the voice channel, Player was destroyed: ${data.reason}`);
-                this.emit(`ERROR`, {
-                    player: this, error
-                });
+                const error = new Error(`Failed to connect to the voice channel, Player was destroyed: ${reason}`);
+                this.emit(`ERROR`, this, error);
                 reject(error);
             };
             this.once(`CONNECTED`, onConnect);
@@ -243,9 +205,7 @@ class Player extends TypedEmitter_1.TypedEmitter {
         this.queuePosition = null;
         this.position = null;
         this.state = PlayerState.DESTROYED;
-        this.emit(`DESTROYED`, {
-            player: this, reason
-        });
+        this.emit(`DESTROYED`, this, reason);
         this.removeAllListeners();
         this.manager.players.delete(this.options.guildId);
     }
@@ -344,9 +304,7 @@ class Player extends TypedEmitter_1.TypedEmitter {
             pause: true
         });
         this.state = PlayerState.PAUSED;
-        this.emit(`PAUSED`, {
-            player: this, reason
-        });
+        this.emit(`PAUSED`, this, reason);
     }
     /**
      * Resume a track.
@@ -360,9 +318,7 @@ class Player extends TypedEmitter_1.TypedEmitter {
             pause: false
         });
         this.state = PlayerState.PLAYING;
-        this.emit(`RESUMED`, {
-            player: this, reason
-        });
+        this.emit(`RESUMED`, this, reason);
     }
     /**
      * Stop the player.
@@ -445,11 +401,9 @@ class Player extends TypedEmitter_1.TypedEmitter {
      * @param data [Voice state update](https://discord.com/developers/docs/topics/gateway#voice-state-update) data.
      * @internal
      */
-    async _handleMove(newChannel, data) {
+    _handleMove(newChannel, data) {
         if (newChannel !== this.currentVoiceChannel)
-            this.emit(`MOVED`, {
-                player: this, oldChannel: this.currentVoiceChannel, newChannel
-            });
+            this.emit(`MOVED`, this, this.currentVoiceChannel, newChannel);
         const wasCorrect = this.options.voiceChannelId === this.currentVoiceChannel;
         const nowCorrect = this.options.voiceChannelId === newChannel;
         const wasSuppressed = this._lastVoiceState?.suppress ?? false;
@@ -472,17 +426,17 @@ class Player extends TypedEmitter_1.TypedEmitter {
                         void this.resume(`Became a speaker`);
                     else if (this.state === PlayerState.PLAYING && !wasSuppressed && nowSuppressed) {
                         void this.pause(`Moved to the audience`);
-                        const permissions = await this.manager.adapter.hasPerms(this.options.guildId, this.options.voiceChannelId);
-                        if (permissions.REQUEST_TO_SPEAK) {
-                            await this.manager.adapter.modifyCurrentUserVoiceState(this.options.guildId, {
-                                channel_id: this.options.voiceChannelId, request_to_speak_timestamp: new Date().toISOString()
-                            });
-                        }
-                        else if (permissions.MUTE_MEMBERS) {
-                            await this.manager.adapter.modifyCurrentUserVoiceState(this.options.guildId, {
-                                channel_id: this.options.voiceChannelId, suppress: false
-                            });
-                        }
+                        // todo
+                        // const permissions = await this.manager.adapter.hasPerms(this.options.guildId, this.options.voiceChannelId);
+                        // if (permissions.REQUEST_TO_SPEAK) {
+                        //     await this.manager.client.rest.modifyCurrentUserVoiceState(this.options.guildId, {
+                        //         channel_id: this.options.voiceChannelId, request_to_speak_timestamp: new Date().toISOString()
+                        //     });
+                        // } else if (permissions.MUTE_MEMBERS) {
+                        //     await this.manager.client.rest.modifyCurrentUserVoiceState(this.options.guildId, {
+                        //         channel_id: this.options.voiceChannelId, suppress: false
+                        //     });
+                        // }
                     }
                 }
             }
@@ -503,9 +457,7 @@ class Player extends TypedEmitter_1.TypedEmitter {
      */
     async _advanceQueue() {
         if (this.state !== PlayerState.CONNECTED && this.state !== PlayerState.PAUSED && this.state !== PlayerState.PLAYING)
-            return void this.emit(`ERROR`, {
-                player: this, error: new Error(`Cannot advance the queue when the player isn't in a connected, paused, or playing state`)
-            });
+            return void this.emit(`ERROR`, this, new Error(`Cannot advance the queue when the player isn't in a connected, paused, or playing state`));
         if (this.queuePosition === null)
             this.queuePosition = 0;
         else {
@@ -517,9 +469,7 @@ class Player extends TypedEmitter_1.TypedEmitter {
         if (this.currentTrack) {
             if (this.currentTrack instanceof Track_1.TrackPartial) {
                 const resolved = await this.manager.resolveTrack(this.currentTrack).catch((error) => {
-                    this.emit(`ERROR`, {
-                        player: this, error
-                    });
+                    this.emit(`ERROR`, this, error);
                 });
                 if (!resolved) {
                     if (this.loop === `single`)
@@ -530,18 +480,14 @@ class Player extends TypedEmitter_1.TypedEmitter {
                 this.queue[this.queuePosition] = resolved;
             }
             if (!(this.currentTrack instanceof Track_1.Track) || !(this.currentTrack).track) {
-                this.emit(`ERROR`, {
-                    player: this, error: new Error(`Unable to get Track from new queue position while advancing the queue`)
-                });
+                this.emit(`ERROR`, this, new Error(`Unable to get Track from new queue position while advancing the queue`));
                 if (this.loop === `single`)
                     this.queuePosition++;
                 await this._advanceQueue();
                 return;
             }
             this._play(this.currentTrack).catch(async (error) => {
-                this.emit(`ERROR`, {
-                    player: this, error
-                });
+                this.emit(`ERROR`, this, error);
                 if (this.loop === `single`)
                     this.queuePosition++;
                 await this._advanceQueue();
@@ -557,12 +503,7 @@ class Player extends TypedEmitter_1.TypedEmitter {
      * Disconnect the bot from VC.
      */
     async _disconnect() {
-        await this.manager.adapter.updateVoiceState({
-            guild_id: this.options.guildId,
-            channel_id: null,
-            self_mute: false,
-            self_deaf: false
-        });
+        await this.manager.client.gateway.updateVoiceState(this.options.guildId, null);
         this.currentVoiceChannel = null;
         this.state = PlayerState.DISCONNECTED;
     }
@@ -570,7 +511,7 @@ class Player extends TypedEmitter_1.TypedEmitter {
      * Handle incoming payloads from the attached node.
      * @param payload The received payload.
      */
-    async _handlePayload({ payload }) {
+    async _handlePayload(_, payload) {
         if (payload.guildId !== this.options.guildId)
             return;
         if (payload.op === `playerUpdate`) {
@@ -585,17 +526,13 @@ class Player extends TypedEmitter_1.TypedEmitter {
                 case `TrackEndEvent`: {
                     this.position = null;
                     this.state = PlayerState.CONNECTED;
-                    this.emit(`TRACK_END`, {
-                        player: this, track, reason: payload.reason
-                    });
+                    this.emit(`TRACK_END`, this, track, payload.reason);
                     if (payload.reason !== `STOPPED` && payload.reason !== `REPLACED`)
                         void this._advanceQueue();
                     break;
                 }
                 case `TrackExceptionEvent`: {
-                    this.emit(`TRACK_EXCEPTION`, {
-                        player: this, track, message: payload.exception.message, severity: payload.exception.severity, cause: payload.exception.cause
-                    });
+                    this.emit(`TRACK_EXCEPTION`, this, track, payload.exception.message, payload.exception.severity, payload.exception.cause);
                     break;
                 }
                 case `TrackStartEvent`: {
@@ -605,15 +542,11 @@ class Player extends TypedEmitter_1.TypedEmitter {
                     }
                     else
                         this.state = PlayerState.PLAYING;
-                    this.emit(`TRACK_START`, {
-                        player: this, track
-                    });
+                    this.emit(`TRACK_START`, this, track);
                     break;
                 }
                 case `TrackStuckEvent`: {
-                    this.emit(`TRACK_STUCK`, {
-                        player: this, track, thresholdMs: payload.thresholdMs
-                    });
+                    this.emit(`TRACK_STUCK`, this, track, payload.thresholdMs);
                     await this._stop().catch(() => { });
                     void this._advanceQueue();
                     break;

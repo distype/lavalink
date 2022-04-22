@@ -8,26 +8,25 @@ const Node_1 = require("./Node");
 const Track_1 = require("./Track");
 const Player_1 = require("./Player");
 const Constants_1 = __importDefault(require("../util/Constants"));
-const TypedEmitter_1 = require("../util/TypedEmitter");
-const collection_1 = __importDefault(require("@discordjs/collection"));
+const node_utils_1 = require("@br88c/node-utils");
 const undici_1 = require("undici");
-class LavalinkManager extends TypedEmitter_1.TypedEmitter {
+class LavalinkManager extends node_utils_1.TypedEmitter {
     /**
      * Create a lavalink manager.
      * @param options The options to use for the manager.
-     * @param adapter The manager's library adapter.
+     * @param client The manager's client.
      */
-    constructor(options, adapter) {
+    constructor(options, client) {
         super();
-        this.adapter = adapter;
+        this.client = client;
         /**
          * The manager's nodes.
          */
-        this.nodes = new collection_1.default();
+        this.nodes = new node_utils_1.ExtendedMap();
         /**
          * The manager's players.
          */
-        this.players = new collection_1.default();
+        this.players = new node_utils_1.ExtendedMap();
         /**
          * The manager's spotify token.
          * Set when running LavalinkManager#connectNodes().
@@ -35,8 +34,8 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
         this.spotifyToken = null;
         if (!options)
             throw new TypeError(`Expected options to be defined`);
-        if (!adapter)
-            throw new TypeError(`Expected worker to be defined`);
+        if (!client)
+            throw new TypeError(`Expected client to be defined`);
         if (!options.nodeOptions?.length)
             throw new Error(`At least 1 node must be defined`);
         if (options.enabledSources && options.defaultSource && !options.enabledSources.includes(options.defaultSource))
@@ -52,7 +51,8 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
             defaultSource: options.defaultSource ?? `youtube`,
             spotifyAuth: options.spotifyAuth
         };
-        adapter.bind(this);
+        this.client.gateway.on(`VOICE_SERVER_UPDATE`, ({ d }) => this._handleVoiceUpdate(`VOICE_SERVER_UPDATE`, d));
+        this.client.gateway.on(`VOICE_STATE_UPDATE`, ({ d }) => this._handleVoiceUpdate(`VOICE_STATE_UPDATE`, d));
     }
     /**
      * Nodes sorted by cpu load.
@@ -75,9 +75,7 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
             let attempts = 0;
             const tryConnect = async () => {
                 if (node.options.maxRetrys !== 0 && attempts >= node.options.maxRetrys) {
-                    node.emit(`ERROR`, {
-                        node, error: new Error(`Unable to connect after ${attempts} attempts`)
-                    });
+                    node.emit(`ERROR`, node, new Error(`Unable to connect after ${attempts} attempts`));
                     if (connectInterval)
                         clearInterval(connectInterval);
                     reject(new Error(`Max connect retrys reached`));
@@ -194,17 +192,17 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
         }
         else {
             const res = await searchNode.request(`GET`, `/loadtracks`, { query: { identifier: Constants_1.default.URL_REGEX.test(query) ? query : `${Constants_1.default.SOURCE_IDENTIFIERS[source]}search:${query}` } });
-            if (!res?.json)
+            if (!res)
                 throw new Error(`No search response data`);
             const searchResult = {
-                loadType: res.json.loadType,
-                tracks: res.json.tracks.map((data) => new Track_1.Track(data, requester)),
-                exception: res.json.exception
+                loadType: res.loadType,
+                tracks: res.tracks.map((data) => new Track_1.Track(data, requester)),
+                exception: res.exception
             };
-            if (res.json.playlistInfo) {
+            if (res.playlistInfo) {
                 searchResult.playlistInfo = {
-                    name: res.json.playlistInfo.Name,
-                    selectedTrack: typeof res.json.playlistInfo.selectedTrack === `number` ? searchResult.tracks[res.json.playlistInfo.selectedTrack] : null
+                    name: res.playlistInfo.Name,
+                    selectedTrack: typeof res.playlistInfo.selectedTrack === `number` ? searchResult.tracks[res.playlistInfo.selectedTrack] : null
                 };
             }
             return searchResult;
@@ -220,9 +218,9 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
         if (!decodeNode)
             throw new Error(`No available nodes to decode the track`);
         const res = await decodeNode.request(`POST`, `/decodetracks`, { body: JSON.stringify(tracks) });
-        if (!res?.json)
+        if (!res)
             throw new Error(`No decode response data`);
-        return res.json.map((data) => new Track_1.Track(data, `N/A`));
+        return res.map((data) => new Track_1.Track(data, `N/A`));
     }
     /**
      * Resolve a track partial into a track.
@@ -240,9 +238,9 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
                 return sameAuthor[0];
         }
         if (track.length) {
-            const sameDuration = search.tracks.filter((t) => t.length &&
-                (t.length >= ((track.length ?? 0) - 2000)) &&
-                (t.length <= ((track.length ?? 0) + 200)));
+            const sameDuration = search.tracks.filter((t) => t.length
+                && (t.length >= ((track.length ?? 0) - 2000))
+                && (t.length <= ((track.length ?? 0) + 200)));
             if (sameDuration.length)
                 return sameDuration[0];
         }
@@ -254,22 +252,25 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
      * @param data Data from the event.
      * @internal
      */
-    async _handleVoiceUpdate(event, data) {
+    _handleVoiceUpdate(event, data) {
         if (!data.guild_id)
             return;
         const player = this.players.get(data.guild_id);
         if (!player)
             return;
         if (event === `VOICE_STATE_UPDATE`) {
-            if (data.user_id !== this.adapter.getBotId())
+            if (data.user_id !== this.client.gateway.user?.id)
                 return;
             void player._handleMove(data.channel_id, data);
         }
         else if (event === `VOICE_SERVER_UPDATE`) {
+            const shard = this.client.gateway.guildShard(player.options.guildId);
+            if (typeof shard === `number`)
+                return;
             player.node.send({
                 op: `voiceUpdate`,
                 guildId: player.options.guildId,
-                sessionId: await this.adapter.getGuildShardSessionId(player.options.guildId),
+                sessionId: shard.sessionId,
                 event: data
             }).catch(() => { });
         }
@@ -295,9 +296,7 @@ class LavalinkManager extends TypedEmitter_1.TypedEmitter {
         if (!data?.access_token)
             throw new Error(`Invalid Spotify authentication`);
         this.spotifyToken = `Bearer ${data.access_token}`;
-        this.emit(`SPOTIFY_AUTHORIZED`, {
-            expiresIn: data.expires_in * 1000, token: this.spotifyToken
-        });
+        this.emit(`SPOTIFY_AUTHORIZED`, data.expires_in * 1000, this.spotifyToken);
         return data.expires_in * 1000;
     }
     /**

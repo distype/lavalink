@@ -1,52 +1,39 @@
 import { NodeStats } from '../typings/Lavalink';
 import { LavalinkManager } from '../typings/lib';
-import { TypedEmitter } from '../util/TypedEmitter';
-import { Dispatcher, request } from 'undici';
+import { TypedEmitter } from '@br88c/node-utils';
+import { request } from 'undici';
 /**
  * {@link Node} events.
  */
-export interface NodeEvents {
+export interface NodeEvents extends Record<string, (...args: any[]) => void> {
     /**
      * Emitted when the node connects to the lavalink server.
      */
-    CONNECTED: Node;
+    CONNECTED: (node: Node) => void;
     /**
      * Emitted when the node is created.
      */
-    CREATED: Node;
+    CREATED: (node: Node) => void;
     /**
      * Emitted when the node is destroyed.
      */
-    DESTROYED: {
-        node: Node;
-        reason: string;
-    };
+    DESTROYED: (node: Node, reason: string) => void;
     /**
      * Emitted when the node disconnects from the lavalink server.
      */
-    DISCONNECTED: {
-        node: Node;
-        code: number;
-        reason: string;
-    };
+    DISCONNECTED: (node: Node, code: number, reason: string) => void;
     /**
      * Emitted when the node encounters an error.
      */
-    ERROR: {
-        node: Node;
-        error: Error;
-    };
+    ERROR: (node: Node, error: Error) => void;
     /**
      * Emitted when the node receives a payload from the server.
      */
-    RAW: {
-        node: Node;
-        payload: any;
-    };
+    RAW: (node: Node, raw: any) => void;
     /**
      * Emitted when the node is attempting to reconnect.
      */
-    RECONNECTING: Node;
+    RECONNECTING: (node: Node) => void;
 }
 /**
  * Options used when creating a {@link Node node}.
@@ -224,10 +211,7 @@ export declare class Node extends TypedEmitter<NodeEvents> {
      * @param options Request options.
      * @returns The response from the server.
      */
-    request(method: NodeRequestMethods, route: string, options?: NodeRequestOptions): Promise<{
-        res: Dispatcher.ResponseData;
-        json: any;
-    }>;
+    request(method: NodeRequestMethods, route: string, options?: NodeRequestOptions): Promise<any>;
     /**
      * Attempt to reconnect the node to the server.
      */
