@@ -1,39 +1,61 @@
-import { TrackData } from '../typings/Lavalink';
-export declare type TrackThumbnailResolution = `default` | `mqdefault` | `hqdefault` | `maxresdefault`;
 /**
- * Track partial - represents an unresolved {@link Track track}.
+ * Track data received from the server.
+ * This is used internally when creating the Track class, and is not easily accessible by the user.
+ * @internal
  */
-export declare class TrackPartial {
+export interface TrackData {
     /**
-     * The tracks's title.
+     * The base64 encoded track.
      */
-    readonly title: string;
+    readonly track: string;
     /**
-     * The track's requester.
+     * Track information.
      */
-    readonly requester: string;
+    readonly info: TrackInfo;
+}
+/**
+ * Track information from the server.
+ * This is used internally when creating the Track class, and is not easily accessible by the user.
+ * @internal
+ */
+export interface TrackInfo {
+    /**
+     * The track's identifier.
+     */
+    readonly identifier: string;
     /**
      * The track's author.
      */
-    readonly author?: string;
+    readonly author: string;
     /**
-     * The track's length in milliseconds.
+     * The length of the track in milliseconds.
      */
-    readonly length?: number;
+    readonly length: number;
     /**
-   * Create a track partial.
-   * @param title The track's title.
-   * @param requester The track's requester.
-   * @param author The track's author.
-   * @param length The track's length in milliseconds.
-   */
-    constructor(title: string, requester: string, author?: string, length?: number);
+     * If the track is a stream.
+     */
+    readonly isStream: boolean;
+    /**
+     * The current position in the track, in milliseconds.
+     */
+    readonly position: number;
+    /**
+     * The track's title.
+     */
+    readonly title: string;
+    /**
+     * The track's URI.
+     */
+    readonly uri: string;
+    /**
+     * The name of the track's source.
+     */
+    readonly sourceName: string;
 }
 /**
  * A track.
  */
-export declare class Track {
-    readonly requester: string;
+export declare class Track implements TrackInfo {
     /**
      * The track encoded into base64.
      */
@@ -42,10 +64,6 @@ export declare class Track {
      * The track's identifier.
      */
     readonly identifier: string;
-    /**
-     * If the track is seekable.
-     */
-    readonly isSeekable: boolean;
     /**
      * The track's author.
      */
@@ -75,6 +93,10 @@ export declare class Track {
      */
     readonly sourceName: string;
     /**
+     * The track's requester.
+     */
+    readonly requester: string;
+    /**
      * Create a new track.
      * @param data Track data from the server.
      * @param requester The track's requester.
@@ -85,5 +107,34 @@ export declare class Track {
      * @param resolution The thumbnail resolution.
      * @returns The track's thumbnail, if available.
      */
-    thumbnail(resolution: TrackThumbnailResolution): string | undefined;
+    thumbnail(resolution: `default` | `mqdefault` | `hqdefault` | `maxresdefault`): string | undefined;
+}
+/**
+ * Track partial - represents an unresolved {@link Track track}.
+ */
+export declare class TrackPartial {
+    /**
+     * The tracks's title.
+     */
+    readonly title: string;
+    /**
+     * The track's requester.
+     */
+    readonly requester: string;
+    /**
+     * The track's author.
+     */
+    readonly author?: string;
+    /**
+     * The track's length in milliseconds.
+     */
+    readonly length?: number;
+    /**
+   * Create a track partial.
+   * @param title The track's title.
+   * @param requester The track's requester.
+   * @param author The track's author.
+   * @param length The track's length in milliseconds.
+   */
+    constructor(title: string, requester: string, author?: string, length?: number);
 }

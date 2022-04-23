@@ -1,41 +1,39 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Node = exports.NodeState = void 0;
-const LavalinkManager_1 = require("./LavalinkManager");
 const node_utils_1 = require("@br88c/node-utils");
 const undici_1 = require("undici");
-const url_1 = require("url");
 const ws_1 = require("ws");
 /**
- * A {@link Node node}'s state.
+ * {@link Node} states.
  */
 var NodeState;
 (function (NodeState) {
-    NodeState[NodeState["DISCONNECTED"] = 0] = "DISCONNECTED";
+    NodeState[NodeState["IDLE"] = 0] = "IDLE";
     NodeState[NodeState["CONNECTING"] = 1] = "CONNECTING";
-    NodeState[NodeState["RECONNECTING"] = 2] = "RECONNECTING";
-    NodeState[NodeState["CONNECTED"] = 3] = "CONNECTED";
-    NodeState[NodeState["DESTROYED"] = 4] = "DESTROYED";
+    NodeState[NodeState["RUNNING"] = 2] = "RUNNING";
+    NodeState[NodeState["DISCONNECTED"] = 3] = "DISCONNECTED";
 })(NodeState = exports.NodeState || (exports.NodeState = {}));
 /**
  * A lavalink node.
- * Communicates with a lavalink server.
  */
 class Node extends node_utils_1.TypedEmitter {
     /**
-     * Create a node.
+     * Create a lavalink node.
      * @param id The node's ID.
-     * @param manager The node's {@link LavalinkManager manager}.
-     * @param options The {@link NodeOptions options} to use for the node.
+     * @param manager The node's {@link Manager manager}.
+     * @param options The node's {@link NodeOptions options}.
+     * @param logCallback A {@link LogCallback callback} to be used for logging events internally in the node.
+     * @param logThisArg A value to use as `this` in the `logCallback`.
      */
-    constructor(id, manager, options = {}) {
+    constructor(id, manager, options, logCallback = () => { }, logThisArg) {
         super();
         /**
-         * The node's {@link NodeState state}.
+         * The node's {@link NodeState state.}
          */
-        this.state = NodeState.DISCONNECTED;
+        this.state = NodeState.IDLE;
         /**
-         * The {@link NodeStats node's stats}.
+         * The node's {@link NodeStats stats}.
          */
         this.stats = {
             players: 0,
@@ -59,139 +57,108 @@ class Node extends node_utils_1.TypedEmitter {
             }
         };
         /**
-         * Incremented when reconnecting to compare to Node#options#maxRetrys.
+         * If the node was killed. Set back to `false` when a new connection attempt is started.
          */
-        this._reconnectAttempts = 0;
+        this._killed = false;
         /**
-         * Used for delaying reconnection attempts.
+         * If the node has an active spawn loop.
          */
-        this._reconnectTimeout = null;
+        this._spinning = false;
         /**
-         * The node's websocket.
+         * The websocket used.
          */
         this._ws = null;
-        if (typeof id !== `number`)
-            throw new TypeError(`A node ID must be specified`);
-        if (!(manager instanceof LavalinkManager_1.LavalinkManager))
-            throw new TypeError(`A manager must be specified`);
         this.id = id;
+        this.system = `Lavalink Node ${id}`;
         this.manager = manager;
         this.options = {
-            host: options.host ?? `localhost`,
-            port: options.port ?? 2333,
-            password: options.password ?? `youshallnotpass`,
-            secure: options.secure ?? false,
-            resumeKey: options.resumeKey,
-            resumeKeyConfig: options.resumeKeyConfig,
-            clientName: options.clientName ?? `rose-lavalink`,
-            connectionTimeout: options.connectionTimeout ?? 15000,
-            requestTimeout: options.requestTimeout ?? 15000,
-            maxRetrys: options.maxRetrys ?? 10,
-            retryDelay: options.retryDelay ?? 15000,
-            defaultRequestOptions: options.defaultRequestOptions ?? {}
+            defaultRequestOptions: options.defaultRequestOptions ?? {},
+            location: options.location,
+            password: options.password,
+            resumeKeyConfig: options.resumeKeyConfig ?? null,
+            spawnMaxAttempts: options.spawnMaxAttempts ?? 10
         };
-        if (this.options.connectionTimeout > this.options.retryDelay)
-            throw new Error(`Node connection timeout must be greater than the reconnect retry delay`);
-        this.on(`CONNECTED`, (...data) => this.manager.emit(`NODE_CONNECTED`, ...data));
-        this.on(`CREATED`, (...data) => this.manager.emit(`NODE_CREATED`, ...data));
-        this.on(`DESTROYED`, (...data) => this.manager.emit(`NODE_DESTROYED`, ...data));
-        this.on(`DISCONNECTED`, (...data) => this.manager.emit(`NODE_DISCONNECTED`, ...data));
-        this.on(`ERROR`, (...data) => this.manager.emit(`NODE_ERROR`, ...data));
-        this.on(`RAW`, (...data) => this.manager.emit(`NODE_RAW`, ...data));
-        this.on(`RECONNECTING`, (...data) => this.manager.emit(`NODE_RECONNECTING`, ...data));
-        this.emit(`CREATED`, this);
-    }
-    /**
-     * Connect the node to the lavalink server.
-     */
-    async connect() {
-        if (this.state !== NodeState.DISCONNECTED && this.state !== NodeState.RECONNECTING)
-            throw new Error(`Cannot initiate a connection when the node isn't in a disconnected or reconnecting state`);
-        const headers = {
-            'Authorization': this.options.password,
-            'User-Id': this.manager.client.gateway.user?.id,
-            'Client-Name': this.options.clientName
-        };
-        if (this.options.resumeKey)
-            headers[`Resume-Key`] = this.options.resumeKey;
-        return await new Promise((resolve, reject) => {
-            const timedOut = setTimeout(() => {
-                const error = new Error(`Timed out while connecting to the lavalink server`);
-                this.emit(`ERROR`, this, error);
-                reject(error);
-            }, this.options.connectionTimeout);
-            this._ws = new ws_1.WebSocket(`ws${this.options.secure ? `s` : ``}://${this.options.host}:${this.options.port}/`, { headers });
-            if (this.state !== NodeState.RECONNECTING)
-                this.state = NodeState.CONNECTING;
-            this._ws.once(`error`, (error) => {
-                this._ws.removeAllListeners();
-                this._ws = null;
-                if (this.state !== NodeState.RECONNECTING)
-                    this.state = NodeState.DISCONNECTED;
-                this._onError(error);
-                if (timedOut)
-                    clearTimeout(timedOut);
-                reject(error);
-            });
-            this._ws.once(`open`, async () => {
-                this._ws.removeAllListeners();
-                this._onOpen();
-                this._ws.on(`open`, this._onOpen.bind(this));
-                this._ws.on(`close`, this._onClose.bind(this));
-                this._ws.on(`error`, this._onError.bind(this));
-                this._ws.on(`message`, this._onMessage.bind(this));
-                if (timedOut)
-                    clearTimeout(timedOut);
-                if (this.options.resumeKeyConfig) {
-                    await this.send({
-                        op: `configureResuming`,
-                        key: this.options.resumeKeyConfig.key,
-                        timeout: Math.round(this.options.resumeKeyConfig.timeout / 1000)
-                    }).catch((error) => reject(error));
-                }
-                resolve(undefined);
-            });
+        this._log = logCallback.bind(logThisArg);
+        this._log(`Initialized node ${id}`, {
+            level: `DEBUG`, system: this.system
         });
     }
     /**
-     * Destroy the node and all attatched players.
-     * @param reason The reason the node was destroyed.
+     * Connect to the node.
+     * The node must be in a {@link NodeState DISCONNECTED} state.
      */
-    destroy(reason = `Manual destroy`) {
-        this._ws?.close(1000, `destroy`);
-        this._ws?.removeAllListeners();
-        this._ws = null;
-        this._reconnectAttempts = 0;
-        if (this._reconnectTimeout) {
-            clearInterval(this._reconnectTimeout);
-            this._reconnectTimeout = null;
+    async spawn() {
+        if (this._spinning)
+            throw new Error(`Node is already connecting`);
+        this._spinning = true;
+        this._killed = false;
+        for (let i = 0; i < this.options.spawnMaxAttempts; i++) {
+            const attempt = await this._initSocket().then(() => true).catch((error) => {
+                this._log(`Spawn attempt ${i + 1}/${this.options.spawnMaxAttempts} failed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                    level: `ERROR`, system: this.system
+                });
+                return false;
+            });
+            if (attempt) {
+                this._spinning = false;
+                this._log(`Spawned after ${i + 1} attempts`, {
+                    level: `DEBUG`, system: this.system
+                });
+                return;
+            }
+            if (this._killed) {
+                this._enterState(NodeState.IDLE);
+                this._spinning = false;
+                this._log(`Spawning interrupted by kill`, {
+                    level: `DEBUG`, system: this.system
+                });
+                throw new Error(`Node spawn attempts interrupted by kill`);
+            }
         }
-        this.manager.players.filter((player) => player.node.id === this.id).forEach((player) => player.destroy(`Attached node destroyed`));
-        this.state = NodeState.DESTROYED;
-        this.emit(`DESTROYED`, this, reason);
-        this.removeAllListeners();
-        this.manager.nodes.delete(this.id);
+        this._spinning = false;
+        this._enterState(NodeState.IDLE);
+        throw new Error(`Failed to spawn node after ${this.options.spawnMaxAttempts} attempts`);
     }
     /**
-     * Send data to the lavalink server.
-     * @param msg The data to send.
+     * Kill the node.
+     * @param code A socket [close code](https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code). Defaults to `1000`.
+     * @param reason The reason the node is being killed. Defaults to `"Manual kill"`.
      */
-    async send(msg) {
-        if (this.state !== NodeState.CONNECTED)
-            throw new Error(`Cannot send payloads before a connection is established`);
-        return await new Promise((resolve, reject) => {
-            this._ws?.send(JSON.stringify(msg), (error) => {
-                if (error) {
-                    this.emit(`ERROR`, this, error);
-                    reject(error);
-                }
-                else
-                    resolve(true);
-            });
+    kill(code = 1000, reason = `Manual kill`) {
+        this._close(code, reason);
+        this._enterState(NodeState.IDLE);
+        this._killed = true;
+        this._log(`Node killed with code ${code}, reason "${reason}"`, {
+            level: `WARN`, system: this.system
         });
     }
     /**
-     * Make a rest request.
+     * Send data to the node.
+     * @param data The data to send.
+     */
+    async send(data) {
+        const payload = JSON.stringify(data);
+        return await new Promise((resolve, reject) => {
+            if (!this._ws || this._ws.readyState !== ws_1.WebSocket.OPEN) {
+                reject(new Error(`Cannot send data when the socket is not in an OPEN state`));
+            }
+            else {
+                this._ws.send(payload, (error) => {
+                    if (error)
+                        reject(error);
+                    else {
+                        this.emit(`SENT_PAYLOAD`, payload);
+                        this._log(`Sent payload`, {
+                            level: `DEBUG`, system: this.system
+                        });
+                        resolve();
+                    }
+                });
+            }
+        });
+    }
+    /**
+     * Make a REST request.
      * @param method The method to use.
      * @param route The route to use.
      * @param options Request options.
@@ -205,7 +172,9 @@ class Node extends node_utils_1.TypedEmitter {
         };
         if (options.body)
             headers[`Content-Type`] = `application/json`;
-        const res = await (0, undici_1.request)(`http${this.options.secure ? `s` : ``}://${this.options.host}:${this.options.port}/${route.replace(/^\//gm, ``)}${options.query ? `?${new url_1.URLSearchParams(options.query).toString()}` : ``}`, {
+        const url = new URL(`http${this.options.location.secure ? `s` : ``}://${this.options.location.host}:${this.options.location.port}${route}`);
+        url.search = new URLSearchParams(options.query).toString();
+        const req = (0, undici_1.request)(url, {
             ...this.options.defaultRequestOptions,
             ...options,
             method,
@@ -213,67 +182,172 @@ class Node extends node_utils_1.TypedEmitter {
             body: JSON.stringify(options.body),
             bodyTimeout: options.timeout ?? this.options.defaultRequestOptions.timeout
         });
-        return res.statusCode === 204 ? null : await res.body.json().catch(() => null);
+        let unableToParse = false;
+        const res = await req.then(async (r) => ({
+            ...r,
+            body: r.statusCode !== 204 ? await r.body?.json().catch((error) => {
+                unableToParse = (error?.message ?? error) ?? `Unknown reason`;
+            }) : undefined
+        }));
+        if (typeof unableToParse === `string`)
+            throw new Error(`Unable to parse response body: "${unableToParse}"`);
+        if (res.statusCode >= 400)
+            throw new Error(`REST status code ${res.statusCode}`);
+        return res.body;
     }
     /**
-     * Attempt to reconnect the node to the server.
+     * Closes the connection, and cleans up helper variables.
+     * @param code A socket [close code](https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code).
+     * @param reason The reason the node is being closed.
      */
-    _reconnect() {
-        this.state = NodeState.RECONNECTING;
-        this._reconnectTimeout = setInterval(() => {
-            if (this.options.maxRetrys !== 0 && this._reconnectAttempts >= this.options.maxRetrys) {
-                this.emit(`ERROR`, this, new Error(`Unable to reconnect after ${this._reconnectAttempts} attempts.`));
-                return this.destroy();
+    _close(code, reason) {
+        this._log(`Closing... (Code ${code}, reason "${reason}")`, {
+            level: `DEBUG`, system: this.system
+        });
+        this._ws?.removeAllListeners();
+        if (this._ws?.readyState !== ws_1.WebSocket.CLOSED) {
+            try {
+                this._ws?.close(code, reason);
             }
-            this._ws?.removeAllListeners();
-            this._ws = null;
-            this.state = NodeState.RECONNECTING;
-            this.emit(`RECONNECTING`, this);
-            this.connect().catch(() => this._reconnectAttempts++);
-        }, this.options.retryDelay);
-    }
-    /**
-     * Fired when the websocket emits an open event.
-     */
-    _onOpen() {
-        if (this._reconnectTimeout) {
-            clearInterval(this._reconnectTimeout);
-            this._reconnectTimeout = null;
+            catch {
+                this._ws?.terminate();
+            }
         }
-        this.state = NodeState.CONNECTED;
-        this.emit(`CONNECTED`, this);
+        this._ws = null;
     }
     /**
-     * Fired when the websocket emits a close event.
-     * @param code The event's code.
-     * @param reason The close reason.
+     * Enter a state.
+     * @param state The state to enter.
      */
-    _onClose(code, reason) {
-        this.state = NodeState.DISCONNECTED;
-        this.emit(`DISCONNECTED`, this, code, reason.length ? reason : `No reason specified`);
-        if (code !== 1000 && reason !== `destroy`)
-            this._reconnect();
+    _enterState(state) {
+        if (this.state !== state) {
+            this.state = state;
+            this.emit(NodeState[state]);
+            this._log(NodeState[state], {
+                level: `DEBUG`, system: this.system
+            });
+        }
     }
     /**
-     * Fired when the websocket emits an error event.
-     * @param error The error thrown.
+     * Initiate the socket.
      */
-    _onError(error) {
-        if (!error)
+    async _initSocket() {
+        if (!this.manager.client.gateway.user)
+            throw new Error(`Gateway user is not defined`);
+        if (this.state !== NodeState.IDLE && this.state !== NodeState.DISCONNECTED) {
+            this._close(1000, `Restarting`);
+            this._enterState(NodeState.DISCONNECTED);
+        }
+        this._log(`Initiating socket...`, {
+            level: `DEBUG`, system: this.system
+        });
+        this._enterState(NodeState.CONNECTING);
+        const result = await new Promise((resolve, reject) => {
+            const headers = {
+                'Authorization': this.options.password,
+                'User-Id': this.manager.client.gateway.user.id,
+                'Client-Name': this.manager.options.clientName
+            };
+            if (this.options.resumeKeyConfig?.key)
+                headers[`Resume-Key`] = this.options.resumeKeyConfig.key;
+            this._ws = new ws_1.WebSocket(`ws${this.options.location.secure ? `s` : ``}://${this.options.location.host}:${this.options.location.port}/`, { headers });
+            this._ws.once(`close`, (code, reason) => reject(new Error(`Socket closed with code ${code}: "${this._parsePayload(reason)}"`)));
+            this._ws.once(`error`, (error) => reject(error));
+            this._ws.once(`open`, () => {
+                this._log(`Socket open`, {
+                    level: `DEBUG`, system: this.system
+                });
+                this._ws.removeAllListeners();
+                this._ws.on(`close`, this._wsOnClose.bind(this));
+                this._ws.on(`error`, this._wsOnError.bind(this));
+                this._ws.on(`message`, this._wsOnMessage.bind(this));
+                if (this.options.resumeKeyConfig) {
+                    this.send({
+                        op: `configureResuming`,
+                        key: this.options.resumeKeyConfig.key,
+                        timeout: Math.round(this.options.resumeKeyConfig.timeout / 1000)
+                    })
+                        .then(() => {
+                        this._enterState(NodeState.RUNNING);
+                        resolve(true);
+                    })
+                        .catch((error) => reject(error));
+                }
+                else {
+                    this._enterState(NodeState.RUNNING);
+                    resolve(true);
+                }
+            });
+        }).catch((error) => {
+            if (this.state !== NodeState.DISCONNECTED && this.state !== NodeState.IDLE) {
+                this._close(1000, `Failed to initialize node`);
+                this._enterState(NodeState.DISCONNECTED);
+            }
+            return error;
+        });
+        if (result !== true)
+            throw result;
+    }
+    /**
+     * Parses an incoming payload.
+     * @param data The data to parse.
+     * @returns The parsed data.
+     */
+    _parsePayload(data) {
+        try {
+            if (Array.isArray(data))
+                data = Buffer.concat(data);
+            else if (data instanceof ArrayBuffer)
+                data = Buffer.from(data);
+            return JSON.parse(data.toString());
+        }
+        catch (error) {
+            if (typeof data === `string` || (typeof data.toString === `function` && typeof data.toString() === `string`))
+                return data;
+            this._log(`Payload parsing error: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                level: `WARN`, system: this.system
+            });
+        }
+    }
+    /**
+     * When the socket emits a close event.
+     */
+    _wsOnClose(code, reason) {
+        const parsedReason = this._parsePayload(reason);
+        this._log(`Received close code ${code} with reason "${parsedReason}"`, {
+            level: `WARN`, system: this.system
+        });
+        this._close(1000, parsedReason);
+        this._enterState(NodeState.DISCONNECTED);
+        if (this._spinning)
             return;
-        this.emit(`ERROR`, this, error);
+        this._log(`Reconnecting...`, {
+            level: `INFO`, system: this.system
+        });
+        this.spawn()
+            .then(() => this._log(`Reconnected`, {
+            level: `INFO`, system: this.system
+        }))
+            .catch((error) => {
+            this._log(`Error reconnecting: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                level: `ERROR`, system: this.system
+            });
+        });
     }
     /**
-     * Fired when the websocket receives a message payload
-     * @param data The received data.
+     * When the socket emits an error event.
      */
-    _onMessage(data) {
-        if (Array.isArray(data))
-            data = Buffer.concat(data);
-        else if (data instanceof ArrayBuffer)
-            data = Buffer.from(data);
-        const payload = JSON.parse(data.toString());
-        this.emit(`RAW`, this, payload);
+    _wsOnError(error) {
+        this._log((error?.message ?? error) ?? `Unknown reason`, {
+            level: `ERROR`, system: this.system
+        });
+    }
+    /**
+     * When the socket emits a message event.
+     */
+    _wsOnMessage(data) {
+        const payload = this._parsePayload(data);
+        this.emit(`RECEIVED_MESSAGE`, payload);
         switch (payload.op) {
             case `event`:
             case `playerUpdate`: {
@@ -285,7 +359,6 @@ class Node extends node_utils_1.TypedEmitter {
                 break;
             }
             default: {
-                this.emit(`ERROR`, this, new Error(`Received unexpected op "${payload.op}"`));
                 break;
             }
         }

@@ -1,98 +1,71 @@
-import { NodeStats } from '../typings/Lavalink';
-import { LavalinkManager } from '../typings/lib';
+import { Manager } from './Manager';
+import { LogCallback } from '../types/Log';
 import { TypedEmitter } from '@br88c/node-utils';
+import { RestMethod, RestRoute } from 'distype';
 import { request } from 'undici';
 /**
  * {@link Node} events.
  */
 export interface NodeEvents extends Record<string, (...args: any[]) => void> {
     /**
-     * Emitted when the node connects to the lavalink server.
+     * When the {@link Node node} receives a payload. Data is the parsed payload.
      */
-    CONNECTED: (node: Node) => void;
+    RECEIVED_MESSAGE: (payload: any) => void;
     /**
-     * Emitted when the node is created.
+     * When a payload is sent. Data is the sent payload.
      */
-    CREATED: (node: Node) => void;
+    SENT_PAYLOAD: (payload: string) => void;
     /**
-     * Emitted when the node is destroyed.
+     * When the {@link Node node} enters an {@link NodeState idle state}.
      */
-    DESTROYED: (node: Node, reason: string) => void;
+    IDLE: () => void;
     /**
-     * Emitted when the node disconnects from the lavalink server.
+     * When the {@link Node node} enters a {@link NodeState connecting state}.
      */
-    DISCONNECTED: (node: Node, code: number, reason: string) => void;
+    CONNECTING: () => void;
     /**
-     * Emitted when the node encounters an error.
+     * When the {@link Node node} enters a {@link NodeState running state}.
      */
-    ERROR: (node: Node, error: Error) => void;
+    RUNNING: () => void;
     /**
-     * Emitted when the node receives a payload from the server.
+     * When the {@link Node node} enters a {@link NodeState disconnected state}.
      */
-    RAW: (node: Node, raw: any) => void;
-    /**
-     * Emitted when the node is attempting to reconnect.
-     */
-    RECONNECTING: (node: Node) => void;
+    DISCONNECTED: () => void;
 }
 /**
- * Options used when creating a {@link Node node}.
+ * {@link Node} options.
  */
-export declare type NodeOptions = Partial<NodeOptionsComplete>;
-/**
- * Complete {@link Node node} options.
- */
-export interface NodeOptionsComplete {
+export interface NodeOptions {
     /**
-     * The client name to use.
-     * @default 'rose-lavalink'
+     * Default REST request options.
+     * @default {}
      */
-    clientName: string;
+    defaultRequestOptions?: Omit<NodeRequestOptions, `body` | `query`>;
     /**
-     * The amount of time to allow to connect to the lavalink server before timing out.
-     * This must be less than the connect / reconnect retry delay.
-     * @default 15000
+     * The node's location.
      */
-    connectionTimeout: number;
+    location: {
+        /**
+         * The node's host.
+         */
+        host: string;
+        /**
+         * The node's port.
+         */
+        port: number;
+        /**
+         * If the location is secure.
+         */
+        secure: boolean;
+    };
     /**
-     * The default {@link NodeRequestOptions request options} to use.
-     */
-    defaultRequestOptions: Omit<NodeRequestOptions, `body` | `query`>;
-    /**
-     * The host for the node to use.
-     * @default 'localhost'
-     */
-    host: string;
-    /**
-     * The maximum number of times to try to connect or reconnect. Setting this to 0 removes the limit.
-     * @default 10
-     */
-    maxRetrys: number;
-    /**
-     * The password for the node to use.
-     * @default 'youshallnotpass'
+     * The node's password.
      */
     password: string;
     /**
-     * The port for the node to use.
-     * @default 2333
-     */
-    port: number;
-    /**
-     * The time to wait before timing out a request.
-     * @default 15000
-     */
-    requestTimeout: number;
-    /**
-     * A resume key to use when starting the node.
-     * @see [Lavalink Docs](https://github.com/freyacodes/Lavalink/blob/dev/IMPLEMENTATION.md#resuming-lavalink-sessions)
-     */
-    resumeKey?: string;
-    /**
      * Data to configure resuming with.
-     * If undefined resuming will not be configured.
-     * @default undefined
      * @see [Lavalink Docs](https://github.com/freyacodes/Lavalink/blob/dev/IMPLEMENTATION.md#resuming-lavalink-sessions)
+     * @default null
      */
     resumeKeyConfig?: {
         /**
@@ -103,29 +76,23 @@ export interface NodeOptionsComplete {
          * The time in milliseconds after the wrapper disconnects that the lavalink server's session should be closed anyways.
          */
         timeout: number;
-    };
+    } | null;
     /**
-     * The time in milliseconds to wait between connection or reconnection attempts.
-     * This must be greater than the connection timeout.
-     * @default 30000
+     * The maximum number of spawn attempts before rejecting.
+     * @default 10
      */
-    retryDelay: number;
-    /**
-     * If the websocket connection is secure.
-     * @default false
-     */
-    secure: boolean;
+    spawnMaxAttempts?: number;
 }
 /**
- * {@link Node} rest request methods.
- */
-export declare type NodeRequestMethods = `GET` | `POST` | `PUT` | `PATCH` | `DELETE`;
-/**
- * Options for rest requests on a {@link Node node}.
+ * Options for {@link Node node} REST requests.
  * Extends undici request options.
  * @see [Undici Documentation](https://undici.nodejs.org/#/?id=undicirequesturl-options-promise)
  */
-export interface NodeRequestOptions extends Omit<NonNullable<Parameters<typeof request>[1]>, `method` | `bodyTimeout`> {
+export interface NodeRequestOptions extends Omit<NonNullable<Parameters<typeof request>[1]>, `body` | `bodyTimeout` | `method`> {
+    /**
+     * The request body.
+     */
+    body?: Record<string, any>;
     /**
      * The request query.
      */
@@ -137,30 +104,70 @@ export interface NodeRequestOptions extends Omit<NonNullable<Parameters<typeof r
     timeout?: number;
 }
 /**
- * A {@link Node node}'s state.
+ * {@link Node} states.
  */
 export declare enum NodeState {
-    DISCONNECTED = 0,
+    IDLE = 0,
     CONNECTING = 1,
-    RECONNECTING = 2,
-    CONNECTED = 3,
-    DESTROYED = 4
+    RUNNING = 2,
+    DISCONNECTED = 3
+}
+/**
+ * Statistics about a node sent from the lavalink server.
+ */
+export interface NodeStats {
+    /**
+     * The number of players on the node.
+     */
+    players: number;
+    /**
+     * The number of players playing on the node.
+     */
+    playingPlayers: number;
+    /**
+     * The node's uptime.
+     */
+    uptime: number;
+    /**
+     * Memory stats.
+     */
+    memory: {
+        free: number;
+        used: number;
+        allocated: number;
+        reservable: number;
+    };
+    /**
+     * CPU stats.
+     */
+    cpu: {
+        cores: number;
+        systemLoad: number;
+        lavalinkLoad: number;
+    };
+    /**
+     * Frame stats.
+     */
+    frameStats?: {
+        sent: number;
+        nulled: number;
+        deficit: number;
+    };
 }
 /**
  * A lavalink node.
- * Communicates with a lavalink server.
  */
 export declare class Node extends TypedEmitter<NodeEvents> {
     /**
-     * The node's {@link LavalinkManager manager}.
+     * The node's {@link Manager manager}.
      */
-    manager: LavalinkManager;
+    manager: Manager;
     /**
-     * The node's {@link NodeState state}.
+     * The node's {@link NodeState state.}
      */
     state: NodeState;
     /**
-     * The {@link NodeStats node's stats}.
+     * The node's {@link NodeStats stats}.
      */
     stats: NodeStats;
     /**
@@ -168,72 +175,93 @@ export declare class Node extends TypedEmitter<NodeEvents> {
      */
     readonly id: number;
     /**
-     * The node's {@link NodeOptionsComplete options}.
+     * {@link NodeOptions Options} for the node.
      */
-    readonly options: NodeOptionsComplete;
+    readonly options: Required<NodeOptions>;
     /**
-     * Incremented when reconnecting to compare to Node#options#maxRetrys.
+     * The system string used for emitting errors and for the {@link LogCallback log callback}.
      */
-    private _reconnectAttempts;
+    readonly system: `Lavalink Node ${number}`;
     /**
-     * Used for delaying reconnection attempts.
+     * If the node was killed. Set back to `false` when a new connection attempt is started.
      */
-    private _reconnectTimeout;
+    private _killed;
     /**
-     * The node's websocket.
+     * The {@link LogCallback log callback} used by the node.
+     */
+    private _log;
+    /**
+     * If the node has an active spawn loop.
+     */
+    private _spinning;
+    /**
+     * The websocket used.
      */
     private _ws;
     /**
-     * Create a node.
+     * Create a lavalink node.
      * @param id The node's ID.
-     * @param manager The node's {@link LavalinkManager manager}.
-     * @param options The {@link NodeOptions options} to use for the node.
+     * @param manager The node's {@link Manager manager}.
+     * @param options The node's {@link NodeOptions options}.
+     * @param logCallback A {@link LogCallback callback} to be used for logging events internally in the node.
+     * @param logThisArg A value to use as `this` in the `logCallback`.
      */
-    constructor(id: number, manager: LavalinkManager, options?: NodeOptions);
+    constructor(id: number, manager: Manager, options: NodeOptions, logCallback?: LogCallback, logThisArg?: any);
     /**
-     * Connect the node to the lavalink server.
+     * Connect to the node.
+     * The node must be in a {@link NodeState DISCONNECTED} state.
      */
-    connect(): Promise<void>;
+    spawn(): Promise<void>;
     /**
-     * Destroy the node and all attatched players.
-     * @param reason The reason the node was destroyed.
+     * Kill the node.
+     * @param code A socket [close code](https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code). Defaults to `1000`.
+     * @param reason The reason the node is being killed. Defaults to `"Manual kill"`.
      */
-    destroy(reason?: string): void;
+    kill(code?: number, reason?: string): void;
     /**
-     * Send data to the lavalink server.
-     * @param msg The data to send.
+     * Send data to the node.
+     * @param data The data to send.
      */
-    send(msg: any): Promise<boolean>;
+    send(data: any): Promise<void>;
     /**
-     * Make a rest request.
+     * Make a REST request.
      * @param method The method to use.
      * @param route The route to use.
      * @param options Request options.
      * @returns The response from the server.
      */
-    request(method: NodeRequestMethods, route: string, options?: NodeRequestOptions): Promise<any>;
+    request(method: RestMethod, route: RestRoute, options?: NodeRequestOptions): Promise<any>;
     /**
-     * Attempt to reconnect the node to the server.
+     * Closes the connection, and cleans up helper variables.
+     * @param code A socket [close code](https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code).
+     * @param reason The reason the node is being closed.
      */
-    private _reconnect;
+    private _close;
     /**
-     * Fired when the websocket emits an open event.
+     * Enter a state.
+     * @param state The state to enter.
      */
-    private _onOpen;
+    private _enterState;
     /**
-     * Fired when the websocket emits a close event.
-     * @param code The event's code.
-     * @param reason The close reason.
+     * Initiate the socket.
      */
-    private _onClose;
+    private _initSocket;
     /**
-     * Fired when the websocket emits an error event.
-     * @param error The error thrown.
+     * Parses an incoming payload.
+     * @param data The data to parse.
+     * @returns The parsed data.
      */
-    private _onError;
+    private _parsePayload;
     /**
-     * Fired when the websocket receives a message payload
-     * @param data The received data.
+     * When the socket emits a close event.
      */
-    private _onMessage;
+    private _wsOnClose;
+    /**
+     * When the socket emits an error event.
+     */
+    private _wsOnError;
+    /**
+     * When the socket emits a message event.
+     */
+    private _wsOnMessage;
 }
