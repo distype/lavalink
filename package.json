@@ -1,7 +1,7 @@
 {
   "name": "@distype/lavalink",
   "version": "1.0.0",
-  "description": "A lavalink wrapper with native bindings to Distype.",
+  "description": "A Lavalink wrapper with native bindings to Distype.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
