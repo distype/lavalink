@@ -1,8 +1,9 @@
 import { Node, NodeOptions, NodeState } from './Node';
 import { Player, PlayerOptions } from './Player';
-import { Track, TrackData } from './Track';
+import { Track } from './Track';
 
-import { LavalinkConstants } from '../utils/LavalnkConstants';
+import { LogCallback } from '../types/Log';
+import { LavalinkConstants } from '../utils/LavalinkConstants';
 
 import { ExtendedMap, TypedEmitter } from '@br88c/node-utils';
 import { Client, Snowflake } from 'distype';
@@ -94,13 +95,26 @@ export class Manager extends TypedEmitter<ManagerEvents> {
      * {@link ManagerOptions Options} for the manager.
      */
     public readonly options: Required<ManagerOptions>;
+    /**
+     * The system string used for emitting errors and for the {@link LogCallback log callback}.
+     */
+    public readonly system = `Lavalink Manager`;
+
+    /**
+     * The {@link LogCallback log callback} used by the node.
+     */
+    private _log: LogCallback;
+    /**
+     * A value to use as `this` in the `this#_log`.
+     */
+    private _logThisArg?: any;
 
     /**
      * Create a lavalink manager.
      * @param client The manager's Distype client.
      * @param options The {@link ManagerOptions options} to use for the manager.
      */
-    constructor (client: Client, options: ManagerOptions) {
+    constructor (client: Client, options: ManagerOptions, logCallback: LogCallback = (): void => {}, logThisArg?: any) {
         super();
 
         this.client = client;
@@ -111,10 +125,24 @@ export class Manager extends TypedEmitter<ManagerEvents> {
             leastLoadSort: options.leastLoadSort ?? `system`
         };
 
-        options.nodeOptions.forEach((nodeOptions, i) => this.nodes.set(i, new Node(i, this, nodeOptions)));
+        options.nodeOptions.forEach((nodeOptions, i) => {
+            const node = new Node(i, this, nodeOptions, logCallback, logThisArg);
+            this.nodes.set(i, node);
+
+            node.on(`RECEIVED_MESSAGE`, (payload) => {
+                const player = this.players.get(payload.guildId);
+                if (player) player.handlePayload(payload);
+            });
+        });
 
         this.client.gateway.on(`VOICE_SERVER_UPDATE`, this._handleVoiceServerUpdate.bind(this));
         this.client.gateway.on(`VOICE_STATE_UPDATE`, this._handleVoiceStateUpdate.bind(this));
+
+        this._log = logCallback.bind(logThisArg);
+        this._logThisArg = logThisArg;
+        this._log(`Initialized manager`, {
+            level: `DEBUG`, system: this.system
+        });
     }
 
     /**
@@ -132,9 +160,23 @@ export class Manager extends TypedEmitter<ManagerEvents> {
      * @returns The results of node connection attempts.
      */
     public async spawnNodes (): Promise<void> {
+        this._log(`Spawning ${this.nodes.size} nodes`, {
+            level: `INFO`, system: this.system
+        });
+
         const connect: Array<Promise<void>> = [];
         this.nodes.forEach((node) => connect.push(node.spawn()));
-        await Promise.allSettled(connect);
+        const results = await Promise.allSettled(connect);
+
+        const success = results.filter((result) => result.status === `fulfilled`).length;
+        const failed = this.nodes.size - success;
+
+        this._log(`${success}/${success + failed} nodes spawned`, {
+            level: `INFO`, system: this.system
+        });
+        if (failed > 0) this._log(`${failed} nodes failed to spawn`, {
+            level: `WARN`, system: this.system
+        });
     }
 
     /**
@@ -153,7 +195,7 @@ export class Manager extends TypedEmitter<ManagerEvents> {
         const node = this.availableNodes[0];
         if (!node) throw new Error(`No available nodes to bind the player to`);
 
-        const player = new Player(this, node, guild, textChannel, voiceChannel, options);
+        const player = new Player(this, node, guild, textChannel, voiceChannel, options, this._log, this._logThisArg);
         this.players.set(guild, player);
         return player;
     }
@@ -176,7 +218,10 @@ export class Manager extends TypedEmitter<ManagerEvents> {
 
         const searchResult: ManagerSearchResult = {
             loadType: res.loadType,
-            tracks: res.tracks.map((data: TrackData) => new Track(data, requester)),
+            tracks: res.tracks.map((data: any) => new Track({
+                track: data.track,
+                ...data.info
+            }, requester)),
             exception: res.exception
         };
 
@@ -203,11 +248,19 @@ export class Manager extends TypedEmitter<ManagerEvents> {
         else if (tracks.length === 1) {
             const res = await decodeNode.request(`GET`, `/decodetrack`, { query: { track: tracks[0] } });
             if (typeof res !== `object` || res === null) throw new Error(`No decode response data`);
-            return [new Track(res)];
+            return [
+                new Track({
+                    track: tracks[0],
+                    ...res
+                })
+            ];
         } else {
             const res = await decodeNode.request(`POST`, `/decodetracks`, { body: tracks });
             if (!Array.isArray(res)) throw new Error(`No decode response data`);
-            return res.map((data: TrackData) => new Track(data));
+            return res.map((data) => new Track({
+                track: data.track,
+                ...data.info
+            }));
         }
     }
 

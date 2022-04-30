@@ -3,10 +3,11 @@ import { Node } from './Node';
 import { Track } from './Track';
 
 import { LogCallback } from '../types/Log';
-import { LavalinkConstants } from '../utils/LavalnkConstants';
+import { LavalinkConstants } from '../utils/LavalinkConstants';
 
 import { TypedEmitter } from '@br88c/node-utils';
 import { ChannelType, GatewayVoiceStateUpdateDispatchData } from 'discord-api-types/v10';
+import { VoiceCloseCodes } from 'discord-api-types/voice/v4';
 import { PermissionsUtils, Snowflake } from 'distype';
 
 export interface PlayerEvents extends Record<string, (...args: any[]) => void> {
@@ -31,6 +32,10 @@ export interface PlayerEvents extends Record<string, (...args: any[]) => void> {
      * Emitted when the server sends a track stuck event.
      */
     TRACK_STUCK: (thresholdMs: number, track?: Track) => void
+    /**
+     * When the node receives a voice websocket close. Note that `4014` close codes are not emitted.
+     */
+    WEBSOCKET_CLOSED: (code: number, reason: string, byRemote: boolean) => void
 }
 
 /**
@@ -234,8 +239,6 @@ export class Player extends TypedEmitter<PlayerEvents> {
         };
         this.system = `Lavalink Player ${this.guild}`;
 
-        this.node.on(`RECEIVED_MESSAGE`, this._handlePayload.bind(this));
-
         this._log = logCallback.bind(logThisArg);
         this._log(`Initialized player ${this.guild}`, {
             level: `DEBUG`, system: this.system
@@ -285,7 +288,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
             level: `DEBUG`, system: this.system
         });
 
-        await this.manager.client.gateway.updateVoiceState(this.guild, this.voiceChannel, false, this.options.selfDeafen);
+        this.manager.client.gateway.updateVoiceState(this.guild, this.voiceChannel, false, this.options.selfDeafen);
 
         const result = await new Promise<true>((resolve, reject) => {
             const onConnected: () => Promise<void> = async () => {
@@ -330,20 +333,20 @@ export class Player extends TypedEmitter<PlayerEvents> {
             };
 
             const onDestroy = (reason: string): void => {
-                this.removeListener(`CONNECTED`, onConnected);
+                this.removeListener(`VOICE_CONNECTED`, onConnected);
                 if (timedOut) clearTimeout(timedOut);
                 this._spinning = false;
                 reject(new Error(`Failed to connect to the voice channel, Player was destroyed: ${reason}`));
             };
 
             const timedOut = setTimeout(() => {
-                this.removeListener(`CONNECTED`, onConnected);
+                this.removeListener(`VOICE_CONNECTED`, onConnected);
                 this.removeListener(`DESTROYED`, onDestroy);
                 this._spinning = false;
                 reject(new Error(`Timed out while connecting to the voice channel`));
             }, this.options.connectionTimeout);
 
-            this.once(`CONNECTED`, onConnected);
+            this.once(`VOICE_CONNECTED`, onConnected);
             this.once(`DESTROYED`, onDestroy);
         }).catch((error) => {
             this._isSpeaker = null;
@@ -389,8 +392,6 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * @param reason The reason the player was destroyed.
      */
     public destroy (reason = `Manual destroy`): void {
-        this.node.removeListener(`RECEIVED_MESSAGE`, this._handlePayload);
-
         if (this.state >= PlayerState.CONNECTED) {
             this.manager.client.gateway.updateVoiceState(this.guild, null);
         }
@@ -494,6 +495,9 @@ export class Player extends TypedEmitter<PlayerEvents> {
 
         this.state = PlayerState.PAUSED;
         this.emit(`PAUSED`);
+        this._log(`PAUSED`, {
+            level: `DEBUG`, system: this.system
+        });
     }
 
     /**
@@ -510,6 +514,9 @@ export class Player extends TypedEmitter<PlayerEvents> {
 
         this.state = PlayerState.PLAYING;
         this.emit(`RESUMED`);
+        this._log(`RESUMED`, {
+            level: `DEBUG`, system: this.system
+        });
     }
 
     /**
@@ -538,6 +545,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
             if (advanceQueue) await this._advanceQueue();
             else await this.stop();
         }
+
+        this._log(`Removed track ${removedTrack.identifier}`, {
+            level: `DEBUG`, system: this.system
+        });
 
         return removedTrack;
     }
@@ -604,6 +615,9 @@ export class Player extends TypedEmitter<PlayerEvents> {
             if (data.channel_id === this.voiceChannel) {
                 this.state = PlayerState.CONNECTED;
                 this.emit(`VOICE_CONNECTED`, this.voiceChannel);
+                this._log(`VOICE_CONNECTED: Channel ${this.voiceChannel}`, {
+                    level: `DEBUG`, system: this.system
+                });
             } else this.destroy(`Connected to incorrect channel`);
         } else {
             if (data.channel_id === null) return this.destroy(`Disconnected from the voice channel`);
@@ -611,7 +625,11 @@ export class Player extends TypedEmitter<PlayerEvents> {
             let permissions;
             if (this.voiceChannel !== data.channel_id) {
                 this.voiceChannel = data.channel_id;
+
                 this.emit(`VOICE_MOVED`, this.voiceChannel);
+                this._log(`VOICE_MOVED: New channel ${this.voiceChannel}`, {
+                    level: `DEBUG`, system: this.system
+                });
 
                 permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
 
@@ -662,6 +680,107 @@ export class Player extends TypedEmitter<PlayerEvents> {
     }
 
     /**
+     * Handle incoming payloads from the attached node.
+     * @param payload The received payload.
+     * @internal
+     */
+    public async handlePayload (payload: any): Promise<void> {
+        if (payload.guildId !== this.guild) return;
+
+        if (payload.op === `playerUpdate`) {
+            this.trackPosition = payload.state.position ?? null;
+        } else if (payload.op === `event`) {
+            const track: Track | undefined = (typeof payload.track === `string` ? (await this.manager.decodeTracks(payload.track).catch((error) => {
+                this._log(`Unable to decode track from payload: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                    level: `WARN`, system: this.system
+                });
+                return [];
+            })) : [])[0];
+
+            if (track) track.requester = this.currentTrack && this.currentTrack.track === track.track ? this.currentTrack.requester : this.queue.find((v) => v.track === track.track)?.requester;
+
+            switch (payload.type) {
+                case `TrackEndEvent`: {
+                    this.trackPosition = null;
+                    this.state = PlayerState.CONNECTED;
+
+                    this.emit(`TRACK_END`, payload.reason, track);
+                    this._log(`TRACK_END: ${payload.reason} (${track.identifier})`, {
+                        level: `DEBUG`, system: this.system
+                    });
+
+                    if (payload.reason !== `STOPPED` && payload.reason !== `REPLACED`) {
+                        this._advanceQueue().catch((error) => {
+                            this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                                level: `ERROR`, system: this.system
+                            });
+                        });
+                    }
+
+                    break;
+                }
+
+                case `TrackExceptionEvent`: {
+                    this.emit(`TRACK_EXCEPTION`, payload.exception.message, payload.exception.severity, payload.exception.cause, track);
+                    this._log(`TRACK_EXCEPTION: ${payload.exception.message} (Severity ${payload.exception.severity}, track ${track.identifier}), caused by "${payload.exception.cause}"`, {
+                        level: `DEBUG`, system: this.system
+                    });
+
+                    break;
+                }
+
+                case `TrackStartEvent`: {
+                    if (this._sentPausedPlay) {
+                        this.state = PlayerState.PAUSED;
+                        this._sentPausedPlay = null;
+                    } else this.state = PlayerState.PLAYING;
+
+                    this.emit(`TRACK_START`, track);
+                    this._log(`TRACK_START (${track.identifier})`, {
+                        level: `DEBUG`, system: this.system
+                    });
+
+                    break;
+                }
+
+                case `TrackStuckEvent`: {
+                    this.emit(`TRACK_STUCK`, payload.thresholdMs, track);
+                    this._log(`TRACK_END: Threshold ${payload.thresholdMs}ms (${track.identifier})`, {
+                        level: `DEBUG`, system: this.system
+                    });
+
+                    await this._stop().catch((error) => {
+                        this._log(`Unable to stop the current track after TRACK_STUCK: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                            level: `WARN`, system: this.system
+                        });
+                    });
+
+                    await this._advanceQueue().catch((error) => {
+                        this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                            level: `ERROR`, system: this.system
+                        });
+                    });
+
+                    break;
+                }
+
+                case `WebSocketClosedEvent`: {
+                    if (payload.code !== VoiceCloseCodes.Disconnected) {
+                        this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
+                        this._log(`WEBSOCKET_CLOSED: Code ${payload.code}, "${payload.reason}"${payload.byRemove ? `, by remote` : ``}`, {
+                            level: `DEBUG`, system: this.system
+                        });
+
+                        this.destroy(`Disconnected with code ${payload.code}: "${payload.reason}"`);
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
      * Advance the queue.
      */
     private async _advanceQueue (): Promise<void> {
@@ -671,6 +790,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
             });
             return;
         }
+
+        this._log(`Advancing the queue... (Loop type: ${this.loop})`, {
+            level: `DEBUG`, system: this.system
+        });
 
         if (this.queuePosition === null) {
             this.queuePosition = 0;
@@ -699,91 +822,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
                 });
             });
             this.queuePosition = null;
-        }
-    }
 
-    /**
-     * Handle incoming payloads from the attached node.
-     * @param payload The received payload.
-     */
-    private async _handlePayload (payload: any): Promise<void> {
-        if (payload.guildId !== this.guild) return;
-
-        if (payload.op === `playerUpdate`) {
-            this.trackPosition = payload.state.position ?? null;
-        } else if (payload.op === `event`) {
-            const track: Track | undefined = (typeof payload.track === `string` ? (await this.manager.decodeTracks(payload.track).catch((error) => {
-                this._log(`Unable to decode track from payload: ${(error?.message ?? error) ?? `Unknown reason`}`, {
-                    level: `WARN`, system: this.system
-                });
-                return [];
-            })) : [])[0];
-
-            if (track) track.requester = this.currentTrack?.track === track.track ? this.currentTrack.requester : this.queue.find((v) => v.track === track.track)?.requester;
-
-            switch (payload.type) {
-                case `TrackEndEvent`: {
-                    this.trackPosition = null;
-                    this.state = PlayerState.CONNECTED;
-                    this.emit(`TRACK_END`, payload.reason, track);
-
-                    if (payload.reason !== `STOPPED` && payload.reason !== `REPLACED`) {
-                        this._advanceQueue().catch((error) => {
-                            this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
-                                level: `ERROR`, system: this.system
-                            });
-                        });
-                    }
-
-                    break;
-                }
-
-                case `TrackExceptionEvent`: {
-                    this.emit(`TRACK_EXCEPTION`, payload.exception.message, payload.exception.severity, payload.exception.cause, track);
-
-                    break;
-                }
-
-                case `TrackStartEvent`: {
-                    if (this._sentPausedPlay) {
-                        this.state = PlayerState.PAUSED;
-                        this._sentPausedPlay = null;
-                    } else this.state = PlayerState.PLAYING;
-
-                    this.emit(`TRACK_START`, track);
-
-                    break;
-                }
-
-                case `TrackStuckEvent`: {
-                    this.emit(`TRACK_STUCK`, payload.thresholdMs, track);
-
-                    await this._stop().catch((error) => {
-                        this._log(`Unable to stop the current track after TRACK_STUCK: ${(error?.message ?? error) ?? `Unknown reason`}`, {
-                            level: `WARN`, system: this.system
-                        });
-                    });
-
-                    await this._advanceQueue().catch((error) => {
-                        this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
-                            level: `ERROR`, system: this.system
-                        });
-                    });
-
-                    break;
-                }
-
-                case `WebSocketClosedEvent`: {
-                    const message = `Discord socket closed with code ${payload.code}: "${payload.reason}"`;
-                    this._log(message, {
-                        level: `ERROR`, system: this.system
-                    });
-
-                    this.destroy(message);
-
-                    break;
-                }
-            }
+            this._log(`Reached end of the queue`, {
+                level: `DEBUG`, system: this.system
+            });
         }
     }
 
@@ -810,6 +852,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
             guildId: this.guild,
             track: track.track
         }, options));
+
+        this._log(`Playing ${track.identifier}`, {
+            level: `DEBUG`, system: this.system
+        });
     }
 
     /**

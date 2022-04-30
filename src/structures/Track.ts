@@ -9,18 +9,6 @@ export interface TrackData {
      */
     readonly track: string
     /**
-     * Track information.
-     */
-    readonly info: TrackInfo
-}
-
-/**
- * Track information from the server.
- * This is used internally when creating the Track class, and is not easily accessible by the user.
- * @internal
- */
-export interface TrackInfo {
-    /**
      * The track's identifier.
      */
     readonly identifier: string
@@ -57,7 +45,7 @@ export interface TrackInfo {
 /**
  * A track.
  */
-export class Track implements TrackInfo {
+export class Track implements TrackData {
     /**
      * The track's requester.
      * This value can be anything, and solely exists for your convenience.
@@ -108,14 +96,14 @@ export class Track implements TrackInfo {
      */
     constructor (data: TrackData, requester?: string) {
         this.track = data.track;
-        this.identifier = data.info.identifier;
-        this.author = data.info.author;
-        this.length = data.info.length;
-        this.isStream = data.info.isStream;
-        this.position = data.info.position;
-        this.title = data.info.title;
-        this.uri = data.info.uri;
-        this.sourceName = data.info.sourceName;
+        this.identifier = data.identifier;
+        this.author = data.author;
+        this.length = data.length;
+        this.isStream = data.isStream;
+        this.position = data.position;
+        this.title = data.title;
+        this.uri = data.uri;
+        this.sourceName = data.sourceName;
         this.requester = requester;
     }
 

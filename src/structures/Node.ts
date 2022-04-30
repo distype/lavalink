@@ -2,7 +2,7 @@ import { Manager } from './Manager';
 
 import { LogCallback } from '../types/Log';
 
-import { TypedEmitter } from '@br88c/node-utils';
+import { TypedEmitter, wait } from '@br88c/node-utils';
 import { RestMethod, RestRoute } from 'distype';
 import { request } from 'undici';
 import { RawData, WebSocket } from 'ws';
@@ -82,6 +82,11 @@ export interface NodeOptions {
          */
         timeout: number
     } | null
+    /**
+     * The number of milliseconds to wait between spawn and resume attempts.
+     * @default 2500
+     */
+    spawnAttemptDelay?: number
     /**
      * The maximum number of spawn attempts before rejecting.
      * @default 10
@@ -249,6 +254,7 @@ export class Node extends TypedEmitter<NodeEvents> {
             location: options.location,
             password: options.password,
             resumeKeyConfig: options.resumeKeyConfig ?? null,
+            spawnAttemptDelay: options.spawnAttemptDelay ?? 2500,
             spawnMaxAttempts: options.spawnMaxAttempts ?? 10
         };
 
@@ -293,6 +299,10 @@ export class Node extends TypedEmitter<NodeEvents> {
                 });
                 throw new Error(`Node spawn attempts interrupted by kill`);
             }
+
+            if (i < this.options.spawnMaxAttempts - 1) {
+                await wait(this.options.spawnAttemptDelay);
+            }
         }
 
         this._spinning = false;
@@ -331,7 +341,7 @@ export class Node extends TypedEmitter<NodeEvents> {
                     if (error) reject(error);
                     else {
                         this.emit(`SENT_PAYLOAD`, payload);
-                        this._log(`Sent payload`, {
+                        this._log(`Sent payload (opcode ${data.op})`, {
                             level: `DEBUG`, system: this.system
                         });
                         resolve();
