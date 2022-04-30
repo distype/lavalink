@@ -188,6 +188,7 @@ class Player extends node_utils_1.TypedEmitter {
         });
         if (result !== true)
             throw result;
+        this.state = PlayerState.CONNECTED;
     }
     /**
      * Queue and play a track or tracks.
@@ -418,7 +419,6 @@ class Player extends node_utils_1.TypedEmitter {
     async handleMove(data) {
         if (this.state === PlayerState.DISCONNECTED) {
             if (data.channel_id === this.voiceChannel) {
-                this.state = PlayerState.CONNECTED;
                 this.emit(`VOICE_CONNECTED`, this.voiceChannel);
                 this._log(`VOICE_CONNECTED: Channel ${this.voiceChannel}`, {
                     level: `DEBUG`, system: this.system
@@ -437,8 +437,17 @@ class Player extends node_utils_1.TypedEmitter {
                 this._log(`VOICE_MOVED: New channel ${this.voiceChannel}`, {
                     level: `DEBUG`, system: this.system
                 });
-                permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
-                if ((await this.manager.client.getChannelData(this.voiceChannel, `type`)).type === v10_1.ChannelType.GuildStageVoice) {
+                permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel).catch((error) => {
+                    this.destroy(`Unable to get self permissions in the new voice channel: ${(error?.message ?? error) ?? `Unknown reason`}`);
+                });
+                if (typeof permissions !== `bigint`)
+                    return;
+                const channel = await this.manager.client.getChannelData(this.voiceChannel, `type`).catch((error) => {
+                    this.destroy(`Unable to get data for the new voice channel: ${(error?.message ?? error) ?? `Unknown reason`}`);
+                });
+                if (typeof channel !== `object`)
+                    return;
+                if (channel.type === v10_1.ChannelType.GuildStageVoice) {
                     this._isStage = true;
                     this._isSpeaker = data.suppress;
                     if (!distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
@@ -455,26 +464,57 @@ class Player extends node_utils_1.TypedEmitter {
             }
             if (this._isStage) {
                 if (data.suppress && this._isSpeaker) {
-                    await this.pause();
-                    permissions ??= await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
+                    this._isSpeaker = false;
+                    if (!this.paused)
+                        await this.pause().catch((error) => {
+                            this._log(`Unable to pause after being suppressed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                                level: `WARN`, system: this.system
+                            });
+                        });
+                    permissions ??= await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel).catch((error) => {
+                        this.destroy(`Unable to get self permissions in the new voice channel: ${(error?.message ?? error) ?? `Unknown reason`}`);
+                    });
+                    if (typeof permissions !== `bigint`)
+                        return;
                     if (distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER)) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             suppress: false
+                        })
+                            .then(async () => {
+                            this._isSpeaker = true;
+                            if (this.paused)
+                                await this.resume().catch((error) => {
+                                    this._log(`Unable to resume after being suppressed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                                        level: `WARN`, system: this.system
+                                    });
+                                });
+                        })
+                            .catch((error) => {
+                            this._log(`Unable to become a speaker after being suppressed in the stage: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                                level: `WARN`, system: this.system
+                            });
                         });
-                        this._isSpeaker = true;
                     }
-                    else {
+                    if (!this._isSpeaker && distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             request_to_speak_timestamp: new Date().toISOString()
+                        }).catch((error) => {
+                            this._log(`Unable to raise hand after being suppressed in the stage: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                                level: `WARN`, system: this.system
+                            });
                         });
-                        this._isSpeaker = false;
                     }
                 }
                 else if (!data.suppress && !this._isSpeaker) {
                     this._isSpeaker = true;
-                    this.resume();
+                    if (this.paused)
+                        await this.resume().catch((error) => {
+                            this._log(`Unable to resume after being suppressed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                                level: `WARN`, system: this.system
+                            });
+                        });
                 }
             }
         }
@@ -524,16 +564,20 @@ class Player extends node_utils_1.TypedEmitter {
                     break;
                 }
                 case `TrackStartEvent`: {
-                    if (this._sentPausedPlay) {
-                        this.state = PlayerState.PAUSED;
-                        this._sentPausedPlay = null;
-                    }
-                    else
-                        this.state = PlayerState.PLAYING;
                     this.emit(`TRACK_START`, track);
                     this._log(`TRACK_START (${track.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
+                    if (this._sentPausedPlay) {
+                        this._sentPausedPlay = null;
+                        this.state = PlayerState.PAUSED;
+                        this.emit(`PAUSED`);
+                        this._log(`PAUSED`, {
+                            level: `DEBUG`, system: this.system
+                        });
+                    }
+                    else
+                        this.state = PlayerState.PLAYING;
                     break;
                 }
                 case `TrackStuckEvent`: {

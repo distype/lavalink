@@ -6,25 +6,40 @@ import { TypedEmitter } from '@br88c/node-utils';
 import { GatewayVoiceStateUpdateDispatchData } from 'discord-api-types/v10';
 import { Snowflake } from 'distype';
 export interface PlayerEvents extends Record<string, (...args: any[]) => void> {
+    /**
+     * When the player connects to the first voice channel.
+     */
     VOICE_CONNECTED: (channel: Snowflake) => void;
+    /**
+     * When the bot is moved to a different voice channel.
+     */
     VOICE_MOVED: (newChannel: Snowflake) => void;
+    /**
+     * When the player is destroyed.
+     */
     DESTROYED: (reason: string) => void;
+    /**
+     * When the player is paused.
+     */
     PAUSED: () => void;
+    /**
+     * When the player is resumed.
+     */
     RESUMED: () => void;
     /**
-     * Emitted when the server sends a track end event.
+     * Emitted when the node sends a track end event.
      */
     TRACK_END: (reason: string, track?: Track) => void;
     /**
-     * Emitted when the server sends a track exception event.
+     * Emitted when the node sends a track exception event.
      */
     TRACK_EXCEPTION: (message: string, severity: string, cause: string, track?: Track) => void;
     /**
-     * Emitted when the server sends a track start event.
+     * Emitted when the node sends a track start event.
      */
     TRACK_START: (track?: Track) => void;
     /**
-     * Emitted when the server sends a track stuck event.
+     * Emitted when the node sends a track stuck event.
      */
     TRACK_STUCK: (thresholdMs: number, track?: Track) => void;
     /**
