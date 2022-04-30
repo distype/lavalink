@@ -59,6 +59,12 @@ export interface TrackInfo {
  */
 export class Track implements TrackInfo {
     /**
+     * The track's requester.
+     * This value can be anything, and solely exists for your convenience.
+     */
+    public requester?: string;
+
+    /**
      * The track encoded into base64.
      */
     public readonly track: string;
@@ -94,17 +100,13 @@ export class Track implements TrackInfo {
      * The name of the track's source.
      */
     public readonly sourceName: string;
-    /**
-     * The track's requester.
-     */
-    public readonly requester: string;
 
     /**
      * Create a new track.
      * @param data Track data from the server.
-     * @param requester The track's requester.
+     * @param requester The track's requester. This value can be anything, and solely exists for your convenience.
      */
-    constructor (data: TrackData, requester: string) {
+    constructor (data: TrackData, requester?: string) {
         this.track = data.track;
         this.identifier = data.info.identifier;
         this.author = data.info.author;
@@ -125,41 +127,5 @@ export class Track implements TrackInfo {
     public thumbnail (resolution: `default` | `mqdefault` | `hqdefault` | `maxresdefault`): string | undefined {
         if (this.sourceName === `youtube`) return `https://img.youtube.com/vi/${this.identifier}/${resolution}.jpg`;
         else return undefined;
-    }
-}
-
-/**
- * Track partial - represents an unresolved {@link Track track}.
- */
-export class TrackPartial {
-    /**
-     * The tracks's title.
-     */
-    public readonly title: string;
-    /**
-     * The track's requester.
-     */
-    public readonly requester: string;
-    /**
-     * The track's author.
-     */
-    public readonly author?: string;
-    /**
-     * The track's length in milliseconds.
-     */
-    public readonly length?: number;
-
-    /**
-   * Create a track partial.
-   * @param title The track's title.
-   * @param requester The track's requester.
-   * @param author The track's author.
-   * @param length The track's length in milliseconds.
-   */
-    constructor (title: string, requester: string, author?: string, length?: number) {
-        this.title = title;
-        this.requester = requester;
-        this.author = author;
-        this.length = length;
     }
 }
