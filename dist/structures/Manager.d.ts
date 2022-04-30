@@ -1,6 +1,7 @@
 import { Node, NodeOptions } from './Node';
 import { Player, PlayerOptions } from './Player';
-import { Track, TrackPartial } from './Track';
+import { Track } from './Track';
+import { LavalinkConstants } from '../utils/LavalnkConstants';
 import { ExtendedMap, TypedEmitter } from '@br88c/node-utils';
 import { Client, Snowflake } from 'distype';
 /**
@@ -10,11 +11,11 @@ export interface ManagerSearchResult {
     /**
      * The result's load type.
      */
-    loadType: `TRACK_LOADED` | `PLAYLIST_LOADED` | `SEARCH_RESULT` | `NO_MATCHES` | `LOAD_FAILED`;
+    loadType: (typeof LavalinkConstants.LOAD_TYPES)[number];
     /**
      * The found tracks.
      */
-    tracks: Array<Track | TrackPartial>;
+    tracks: Track[];
     /**
      * Playlist info, if applicable.
      */
@@ -33,7 +34,7 @@ export interface ManagerSearchResult {
 /**
  * A search source.
  */
-export declare type ManagerSearchSource = `youtube` | `soundcloud`;
+export declare type ManagerSearchSource = (typeof LavalinkConstants.SOURCE_IDENTIFIERS)[number];
 /**
  * {@link Manager} events.
  */
@@ -51,7 +52,7 @@ export interface ManagerOptions {
     clientName?: string;
     /**
      * The default searching source.
-     * @default `youtube`
+     * @default `yt`
      */
     defaultSearchSource?: ManagerSearchSource;
     /**
@@ -101,17 +102,29 @@ export declare class Manager extends TypedEmitter<ManagerEvents> {
     spawnNodes(): Promise<void>;
     /**
      * Create a new player.
+     * If a player for the specified guild already exists, it is returned and no new player is created.
+     * @param guild The player's guild.
+     * @param textChannel The player's text channel.
+     * @param voiceChannel The player's voice channel.
      * @param options The player's options.
      * @returns The created player.
      */
-    createPlayer(options: PlayerOptions): Player;
+    createPlayer(guild: Snowflake, textChannel: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Player;
     /**
      * Get search results based on a query.
      * If the query is a link, it will attempt to get a track from the link. If not, it will return results from a search using the specified or default source.
      * @param query The query to search with.
-     * @param requester The user that requested the track. This value is not crucial.
+     * @param requester The user that requested the track. This value can be anything, and solely exists for your convenience.
      * @param source The source to use if the query is not a link. Defaults to the manager's default source.
      * @returns The search result.
      */
-    search(query: string, requester: string, source?: ManagerSearchSource): Promise<ManagerSearchResult>;
+    search(query: string, requester?: string, source?: ManagerSearchSource): Promise<ManagerSearchResult>;
+    /**
+     * Decode track strings into an array of tracks.
+     * @param tracks The tracks encoded in base64.
+     * @returns An array of the decoded tracks.
+     */
+    decodeTracks(...tracks: string[]): Promise<Track[]>;
+    private _handleVoiceServerUpdate;
+    private _handleVoiceStateUpdate;
 }

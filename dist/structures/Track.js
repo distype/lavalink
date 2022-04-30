@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TrackPartial = exports.Track = void 0;
+exports.Track = void 0;
 /**
  * A track.
  */
@@ -8,7 +8,7 @@ class Track {
     /**
      * Create a new track.
      * @param data Track data from the server.
-     * @param requester The track's requester.
+     * @param requester The track's requester. This value can be anything, and solely exists for your convenience.
      */
     constructor(data, requester) {
         this.track = data.track;
@@ -35,22 +35,3 @@ class Track {
     }
 }
 exports.Track = Track;
-/**
- * Track partial - represents an unresolved {@link Track track}.
- */
-class TrackPartial {
-    /**
-   * Create a track partial.
-   * @param title The track's title.
-   * @param requester The track's requester.
-   * @param author The track's author.
-   * @param length The track's length in milliseconds.
-   */
-    constructor(title, requester, author, length) {
-        this.title = title;
-        this.requester = requester;
-        this.author = author;
-        this.length = length;
-    }
-}
-exports.TrackPartial = TrackPartial;
