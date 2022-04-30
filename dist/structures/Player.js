@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Player = exports.PlayerState = void 0;
-const LavalnkConstants_1 = require("../utils/LavalnkConstants");
+const LavalinkConstants_1 = require("../utils/LavalinkConstants");
 const node_utils_1 = require("@br88c/node-utils");
 const v10_1 = require("discord-api-types/v10");
+const v4_1 = require("discord-api-types/voice/v4");
 const distype_1 = require("distype");
 /**
  * A {@link Player player}'s state.
@@ -83,7 +84,6 @@ class Player extends node_utils_1.TypedEmitter {
             selfDeafen: options.selfDeafen ?? true
         };
         this.system = `Lavalink Player ${this.guild}`;
-        this.node.on(`RECEIVED_MESSAGE`, this._handlePayload.bind(this));
         this._log = logCallback.bind(logThisArg);
         this._log(`Initialized player ${this.guild}`, {
             level: `DEBUG`, system: this.system
@@ -116,18 +116,18 @@ class Player extends node_utils_1.TypedEmitter {
         if (this.state >= PlayerState.CONNECTED)
             return;
         const permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
-        if (!distype_1.PermissionsUtils.hasPerm(permissions, LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE)) {
-            throw new Error(`Missing one of the following permissions to join the voice channel: "${distype_1.PermissionsUtils.toReadable(LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE).join(`, `)}"`);
+        if (!distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE)) {
+            throw new Error(`Missing one of the following permissions to join the voice channel: "${distype_1.PermissionsUtils.toReadable(LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE).join(`, `)}"`);
         }
         const voiceChannel = await this.manager.client.getChannelData(this.voiceChannel, `type`);
-        if (voiceChannel.type === v10_1.ChannelType.GuildStageVoice && !distype_1.PermissionsUtils.hasPerm(permissions, LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !distype_1.PermissionsUtils.hasPerm(permissions, LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
-            throw new Error(`Missing one of the following permissions to join the stage channel: "${distype_1.PermissionsUtils.toReadable(LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER).join(`, `)}" or "${distype_1.PermissionsUtils.toReadable(LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST).join(`, `)}"`);
+        if (voiceChannel.type === v10_1.ChannelType.GuildStageVoice && !distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
+            throw new Error(`Missing one of the following permissions to join the stage channel: "${distype_1.PermissionsUtils.toReadable(LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER).join(`, `)}" or "${distype_1.PermissionsUtils.toReadable(LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST).join(`, `)}"`);
         }
         this._spinning = true;
         this._log(`Connecting to voice channel ${this.voiceChannel}`, {
             level: `DEBUG`, system: this.system
         });
-        await this.manager.client.gateway.updateVoiceState(this.guild, this.voiceChannel, false, this.options.selfDeafen);
+        this.manager.client.gateway.updateVoiceState(this.guild, this.voiceChannel, false, this.options.selfDeafen);
         const result = await new Promise((resolve, reject) => {
             const onConnected = async () => {
                 this._log(`Connected to voice channel ${this.voiceChannel}`, {
@@ -135,7 +135,7 @@ class Player extends node_utils_1.TypedEmitter {
                 });
                 if (voiceChannel.type === v10_1.ChannelType.GuildStageVoice) {
                     this._isStage = true;
-                    if (distype_1.PermissionsUtils.hasPerm(permissions, LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER)) {
+                    if (distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER)) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             suppress: false
@@ -166,19 +166,19 @@ class Player extends node_utils_1.TypedEmitter {
                 resolve(true);
             };
             const onDestroy = (reason) => {
-                this.removeListener(`CONNECTED`, onConnected);
+                this.removeListener(`VOICE_CONNECTED`, onConnected);
                 if (timedOut)
                     clearTimeout(timedOut);
                 this._spinning = false;
                 reject(new Error(`Failed to connect to the voice channel, Player was destroyed: ${reason}`));
             };
             const timedOut = setTimeout(() => {
-                this.removeListener(`CONNECTED`, onConnected);
+                this.removeListener(`VOICE_CONNECTED`, onConnected);
                 this.removeListener(`DESTROYED`, onDestroy);
                 this._spinning = false;
                 reject(new Error(`Timed out while connecting to the voice channel`));
             }, this.options.connectionTimeout);
-            this.once(`CONNECTED`, onConnected);
+            this.once(`VOICE_CONNECTED`, onConnected);
             this.once(`DESTROYED`, onDestroy);
         }).catch((error) => {
             this._isSpeaker = null;
@@ -222,7 +222,6 @@ class Player extends node_utils_1.TypedEmitter {
      * @param reason The reason the player was destroyed.
      */
     destroy(reason = `Manual destroy`) {
-        this.node.removeListener(`RECEIVED_MESSAGE`, this._handlePayload);
         if (this.state >= PlayerState.CONNECTED) {
             this.manager.client.gateway.updateVoiceState(this.guild, null);
         }
@@ -313,6 +312,9 @@ class Player extends node_utils_1.TypedEmitter {
         });
         this.state = PlayerState.PAUSED;
         this.emit(`PAUSED`);
+        this._log(`PAUSED`, {
+            level: `DEBUG`, system: this.system
+        });
     }
     /**
      * Resume a track.
@@ -327,6 +329,9 @@ class Player extends node_utils_1.TypedEmitter {
         });
         this.state = PlayerState.PLAYING;
         this.emit(`RESUMED`);
+        this._log(`RESUMED`, {
+            level: `DEBUG`, system: this.system
+        });
     }
     /**
      * Stop the player.
@@ -353,6 +358,9 @@ class Player extends node_utils_1.TypedEmitter {
             else
                 await this.stop();
         }
+        this._log(`Removed track ${removedTrack.identifier}`, {
+            level: `DEBUG`, system: this.system
+        });
         return removedTrack;
     }
     /**
@@ -412,6 +420,9 @@ class Player extends node_utils_1.TypedEmitter {
             if (data.channel_id === this.voiceChannel) {
                 this.state = PlayerState.CONNECTED;
                 this.emit(`VOICE_CONNECTED`, this.voiceChannel);
+                this._log(`VOICE_CONNECTED: Channel ${this.voiceChannel}`, {
+                    level: `DEBUG`, system: this.system
+                });
             }
             else
                 this.destroy(`Connected to incorrect channel`);
@@ -423,27 +434,30 @@ class Player extends node_utils_1.TypedEmitter {
             if (this.voiceChannel !== data.channel_id) {
                 this.voiceChannel = data.channel_id;
                 this.emit(`VOICE_MOVED`, this.voiceChannel);
+                this._log(`VOICE_MOVED: New channel ${this.voiceChannel}`, {
+                    level: `DEBUG`, system: this.system
+                });
                 permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
                 if ((await this.manager.client.getChannelData(this.voiceChannel, `type`)).type === v10_1.ChannelType.GuildStageVoice) {
                     this._isStage = true;
                     this._isSpeaker = data.suppress;
-                    if (!distype_1.PermissionsUtils.hasPerm(permissions, LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !distype_1.PermissionsUtils.hasPerm(permissions, LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
-                        return this.destroy(`Missing one of the following permissions in the new stage channel: "${distype_1.PermissionsUtils.toReadable(LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER).join(`, `)}" or "${distype_1.PermissionsUtils.toReadable(LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST).join(`, `)}"`);
+                    if (!distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
+                        return this.destroy(`Missing one of the following permissions in the new stage channel: "${distype_1.PermissionsUtils.toReadable(LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER).join(`, `)}" or "${distype_1.PermissionsUtils.toReadable(LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST).join(`, `)}"`);
                     }
                 }
                 else {
                     this._isStage = false;
                     this._isSpeaker = null;
                 }
-                if (!distype_1.PermissionsUtils.hasPerm(permissions, LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE)) {
-                    return this.destroy(`Missing one of the following permissions in the new voice channel: "${distype_1.PermissionsUtils.toReadable(LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE).join(`, `)}"`);
+                if (!distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE)) {
+                    return this.destroy(`Missing one of the following permissions in the new voice channel: "${distype_1.PermissionsUtils.toReadable(LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE).join(`, `)}"`);
                 }
             }
             if (this._isStage) {
                 if (data.suppress && this._isSpeaker) {
                     await this.pause();
                     permissions ??= await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
-                    if (distype_1.PermissionsUtils.hasPerm(permissions, LavalnkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER)) {
+                    if (distype_1.PermissionsUtils.hasPerm(permissions, LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER)) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             suppress: false
@@ -466,6 +480,93 @@ class Player extends node_utils_1.TypedEmitter {
         }
     }
     /**
+     * Handle incoming payloads from the attached node.
+     * @param payload The received payload.
+     * @internal
+     */
+    async handlePayload(payload) {
+        if (payload.guildId !== this.guild)
+            return;
+        if (payload.op === `playerUpdate`) {
+            this.trackPosition = payload.state.position ?? null;
+        }
+        else if (payload.op === `event`) {
+            const track = (typeof payload.track === `string` ? (await this.manager.decodeTracks(payload.track).catch((error) => {
+                this._log(`Unable to decode track from payload: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                    level: `WARN`, system: this.system
+                });
+                return [];
+            })) : [])[0];
+            if (track)
+                track.requester = this.currentTrack && this.currentTrack.track === track.track ? this.currentTrack.requester : this.queue.find((v) => v.track === track.track)?.requester;
+            switch (payload.type) {
+                case `TrackEndEvent`: {
+                    this.trackPosition = null;
+                    this.state = PlayerState.CONNECTED;
+                    this.emit(`TRACK_END`, payload.reason, track);
+                    this._log(`TRACK_END: ${payload.reason} (${track.identifier})`, {
+                        level: `DEBUG`, system: this.system
+                    });
+                    if (payload.reason !== `STOPPED` && payload.reason !== `REPLACED`) {
+                        this._advanceQueue().catch((error) => {
+                            this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                                level: `ERROR`, system: this.system
+                            });
+                        });
+                    }
+                    break;
+                }
+                case `TrackExceptionEvent`: {
+                    this.emit(`TRACK_EXCEPTION`, payload.exception.message, payload.exception.severity, payload.exception.cause, track);
+                    this._log(`TRACK_EXCEPTION: ${payload.exception.message} (Severity ${payload.exception.severity}, track ${track.identifier}), caused by "${payload.exception.cause}"`, {
+                        level: `DEBUG`, system: this.system
+                    });
+                    break;
+                }
+                case `TrackStartEvent`: {
+                    if (this._sentPausedPlay) {
+                        this.state = PlayerState.PAUSED;
+                        this._sentPausedPlay = null;
+                    }
+                    else
+                        this.state = PlayerState.PLAYING;
+                    this.emit(`TRACK_START`, track);
+                    this._log(`TRACK_START (${track.identifier})`, {
+                        level: `DEBUG`, system: this.system
+                    });
+                    break;
+                }
+                case `TrackStuckEvent`: {
+                    this.emit(`TRACK_STUCK`, payload.thresholdMs, track);
+                    this._log(`TRACK_END: Threshold ${payload.thresholdMs}ms (${track.identifier})`, {
+                        level: `DEBUG`, system: this.system
+                    });
+                    await this._stop().catch((error) => {
+                        this._log(`Unable to stop the current track after TRACK_STUCK: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                            level: `WARN`, system: this.system
+                        });
+                    });
+                    await this._advanceQueue().catch((error) => {
+                        this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                            level: `ERROR`, system: this.system
+                        });
+                    });
+                    break;
+                }
+                case `WebSocketClosedEvent`: {
+                    if (payload.code !== v4_1.VoiceCloseCodes.Disconnected) {
+                        this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
+                        this._log(`WEBSOCKET_CLOSED: Code ${payload.code}, "${payload.reason}"${payload.byRemove ? `, by remote` : ``}`, {
+                            level: `DEBUG`, system: this.system
+                        });
+                        this.destroy(`Disconnected with code ${payload.code}: "${payload.reason}"`);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    /**
      * Advance the queue.
      */
     async _advanceQueue() {
@@ -475,6 +576,9 @@ class Player extends node_utils_1.TypedEmitter {
             });
             return;
         }
+        this._log(`Advancing the queue... (Loop type: ${this.loop})`, {
+            level: `DEBUG`, system: this.system
+        });
         if (this.queuePosition === null) {
             this.queuePosition = 0;
         }
@@ -506,78 +610,9 @@ class Player extends node_utils_1.TypedEmitter {
                     });
                 });
             this.queuePosition = null;
-        }
-    }
-    /**
-     * Handle incoming payloads from the attached node.
-     * @param payload The received payload.
-     */
-    async _handlePayload(payload) {
-        if (payload.guildId !== this.guild)
-            return;
-        if (payload.op === `playerUpdate`) {
-            this.trackPosition = payload.state.position ?? null;
-        }
-        else if (payload.op === `event`) {
-            const track = (typeof payload.track === `string` ? (await this.manager.decodeTracks(payload.track).catch((error) => {
-                this._log(`Unable to decode track from payload: ${(error?.message ?? error) ?? `Unknown reason`}`, {
-                    level: `WARN`, system: this.system
-                });
-                return [];
-            })) : [])[0];
-            if (track)
-                track.requester = this.currentTrack?.track === track.track ? this.currentTrack.requester : this.queue.find((v) => v.track === track.track)?.requester;
-            switch (payload.type) {
-                case `TrackEndEvent`: {
-                    this.trackPosition = null;
-                    this.state = PlayerState.CONNECTED;
-                    this.emit(`TRACK_END`, payload.reason, track);
-                    if (payload.reason !== `STOPPED` && payload.reason !== `REPLACED`) {
-                        this._advanceQueue().catch((error) => {
-                            this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
-                                level: `ERROR`, system: this.system
-                            });
-                        });
-                    }
-                    break;
-                }
-                case `TrackExceptionEvent`: {
-                    this.emit(`TRACK_EXCEPTION`, payload.exception.message, payload.exception.severity, payload.exception.cause, track);
-                    break;
-                }
-                case `TrackStartEvent`: {
-                    if (this._sentPausedPlay) {
-                        this.state = PlayerState.PAUSED;
-                        this._sentPausedPlay = null;
-                    }
-                    else
-                        this.state = PlayerState.PLAYING;
-                    this.emit(`TRACK_START`, track);
-                    break;
-                }
-                case `TrackStuckEvent`: {
-                    this.emit(`TRACK_STUCK`, payload.thresholdMs, track);
-                    await this._stop().catch((error) => {
-                        this._log(`Unable to stop the current track after TRACK_STUCK: ${(error?.message ?? error) ?? `Unknown reason`}`, {
-                            level: `WARN`, system: this.system
-                        });
-                    });
-                    await this._advanceQueue().catch((error) => {
-                        this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
-                            level: `ERROR`, system: this.system
-                        });
-                    });
-                    break;
-                }
-                case `WebSocketClosedEvent`: {
-                    const message = `Discord socket closed with code ${payload.code}: "${payload.reason}"`;
-                    this._log(message, {
-                        level: `ERROR`, system: this.system
-                    });
-                    this.destroy(message);
-                    break;
-                }
-            }
+            this._log(`Reached end of the queue`, {
+                level: `DEBUG`, system: this.system
+            });
         }
     }
     /**
@@ -606,6 +641,9 @@ class Player extends node_utils_1.TypedEmitter {
             guildId: this.guild,
             track: track.track
         }, options));
+        this._log(`Playing ${track.identifier}`, {
+            level: `DEBUG`, system: this.system
+        });
     }
     /**
      * Helper function for sending stop payloads to the server.

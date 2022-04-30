@@ -4,7 +4,7 @@ exports.Manager = void 0;
 const Node_1 = require("./Node");
 const Player_1 = require("./Player");
 const Track_1 = require("./Track");
-const LavalnkConstants_1 = require("../utils/LavalnkConstants");
+const LavalinkConstants_1 = require("../utils/LavalinkConstants");
 const node_utils_1 = require("@br88c/node-utils");
 /**
  * The lavalink manager.
@@ -15,7 +15,7 @@ class Manager extends node_utils_1.TypedEmitter {
      * @param client The manager's Distype client.
      * @param options The {@link ManagerOptions options} to use for the manager.
      */
-    constructor(client, options) {
+    constructor(client, options, logCallback = () => { }, logThisArg) {
         super();
         /**
          * The manager's nodes.
@@ -25,6 +25,10 @@ class Manager extends node_utils_1.TypedEmitter {
          * The manager's players.
          */
         this.players = new node_utils_1.ExtendedMap();
+        /**
+         * The system string used for emitting errors and for the {@link LogCallback log callback}.
+         */
+        this.system = `Lavalink Manager`;
         this.client = client;
         this.options = {
             clientName: options.clientName ?? `@distype/lavalink`,
@@ -32,9 +36,22 @@ class Manager extends node_utils_1.TypedEmitter {
             nodeOptions: options.nodeOptions,
             leastLoadSort: options.leastLoadSort ?? `system`
         };
-        options.nodeOptions.forEach((nodeOptions, i) => this.nodes.set(i, new Node_1.Node(i, this, nodeOptions)));
+        options.nodeOptions.forEach((nodeOptions, i) => {
+            const node = new Node_1.Node(i, this, nodeOptions, logCallback, logThisArg);
+            this.nodes.set(i, node);
+            node.on(`RECEIVED_MESSAGE`, (payload) => {
+                const player = this.players.get(payload.guildId);
+                if (player)
+                    player.handlePayload(payload);
+            });
+        });
         this.client.gateway.on(`VOICE_SERVER_UPDATE`, this._handleVoiceServerUpdate.bind(this));
         this.client.gateway.on(`VOICE_STATE_UPDATE`, this._handleVoiceStateUpdate.bind(this));
+        this._log = logCallback.bind(logThisArg);
+        this._logThisArg = logThisArg;
+        this._log(`Initialized manager`, {
+            level: `DEBUG`, system: this.system
+        });
     }
     /**
      * Available nodes sorted by cpu load.
@@ -50,9 +67,21 @@ class Manager extends node_utils_1.TypedEmitter {
      * @returns The results of node connection attempts.
      */
     async spawnNodes() {
+        this._log(`Spawning ${this.nodes.size} nodes`, {
+            level: `INFO`, system: this.system
+        });
         const connect = [];
         this.nodes.forEach((node) => connect.push(node.spawn()));
-        await Promise.allSettled(connect);
+        const results = await Promise.allSettled(connect);
+        const success = results.filter((result) => result.status === `fulfilled`).length;
+        const failed = this.nodes.size - success;
+        this._log(`${success}/${success + failed} nodes spawned`, {
+            level: `INFO`, system: this.system
+        });
+        if (failed > 0)
+            this._log(`${failed} nodes failed to spawn`, {
+                level: `WARN`, system: this.system
+            });
     }
     /**
      * Create a new player.
@@ -70,7 +99,7 @@ class Manager extends node_utils_1.TypedEmitter {
         const node = this.availableNodes[0];
         if (!node)
             throw new Error(`No available nodes to bind the player to`);
-        const player = new Player_1.Player(this, node, guild, textChannel, voiceChannel, options);
+        const player = new Player_1.Player(this, node, guild, textChannel, voiceChannel, options, this._log, this._logThisArg);
         this.players.set(guild, player);
         return player;
     }
@@ -86,12 +115,15 @@ class Manager extends node_utils_1.TypedEmitter {
         const searchNode = this.availableNodes[0];
         if (!searchNode)
             throw new Error(`No nodes are available to perform a search`);
-        const res = await searchNode.request(`GET`, `/loadtracks`, { query: { identifier: LavalnkConstants_1.LavalinkConstants.URL_REGEX.test(query) ? query : `${source ?? this.options.defaultSearchSource}search:${query}` } });
+        const res = await searchNode.request(`GET`, `/loadtracks`, { query: { identifier: LavalinkConstants_1.LavalinkConstants.URL_REGEX.test(query) ? query : `${source ?? this.options.defaultSearchSource}search:${query}` } });
         if (!res)
             throw new Error(`No search response data`);
         const searchResult = {
             loadType: res.loadType,
-            tracks: res.tracks.map((data) => new Track_1.Track(data, requester)),
+            tracks: res.tracks.map((data) => new Track_1.Track({
+                track: data.track,
+                ...data.info
+            }, requester)),
             exception: res.exception
         };
         if (res.playlistInfo) {
@@ -117,13 +149,21 @@ class Manager extends node_utils_1.TypedEmitter {
             const res = await decodeNode.request(`GET`, `/decodetrack`, { query: { track: tracks[0] } });
             if (typeof res !== `object` || res === null)
                 throw new Error(`No decode response data`);
-            return [new Track_1.Track(res)];
+            return [
+                new Track_1.Track({
+                    track: tracks[0],
+                    ...res
+                })
+            ];
         }
         else {
             const res = await decodeNode.request(`POST`, `/decodetracks`, { body: tracks });
             if (!Array.isArray(res))
                 throw new Error(`No decode response data`);
-            return res.map((data) => new Track_1.Track(data));
+            return res.map((data) => new Track_1.Track({
+                track: data.track,
+                ...data.info
+            }));
         }
     }
     _handleVoiceServerUpdate(payload) {

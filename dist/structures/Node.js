@@ -76,6 +76,7 @@ class Node extends node_utils_1.TypedEmitter {
             location: options.location,
             password: options.password,
             resumeKeyConfig: options.resumeKeyConfig ?? null,
+            spawnAttemptDelay: options.spawnAttemptDelay ?? 2500,
             spawnMaxAttempts: options.spawnMaxAttempts ?? 10
         };
         this._log = logCallback.bind(logThisArg);
@@ -114,6 +115,9 @@ class Node extends node_utils_1.TypedEmitter {
                 });
                 throw new Error(`Node spawn attempts interrupted by kill`);
             }
+            if (i < this.options.spawnMaxAttempts - 1) {
+                await (0, node_utils_1.wait)(this.options.spawnAttemptDelay);
+            }
         }
         this._spinning = false;
         this._enterState(NodeState.IDLE);
@@ -148,7 +152,7 @@ class Node extends node_utils_1.TypedEmitter {
                         reject(error);
                     else {
                         this.emit(`SENT_PAYLOAD`, payload);
-                        this._log(`Sent payload`, {
+                        this._log(`Sent payload (opcode ${data.op})`, {
                             level: `DEBUG`, system: this.system
                         });
                         resolve();

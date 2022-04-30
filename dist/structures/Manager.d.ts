@@ -1,7 +1,8 @@
 import { Node, NodeOptions } from './Node';
 import { Player, PlayerOptions } from './Player';
 import { Track } from './Track';
-import { LavalinkConstants } from '../utils/LavalnkConstants';
+import { LogCallback } from '../types/Log';
+import { LavalinkConstants } from '../utils/LavalinkConstants';
 import { ExtendedMap, TypedEmitter } from '@br88c/node-utils';
 import { Client, Snowflake } from 'distype';
 /**
@@ -86,11 +87,23 @@ export declare class Manager extends TypedEmitter<ManagerEvents> {
      */
     readonly options: Required<ManagerOptions>;
     /**
+     * The system string used for emitting errors and for the {@link LogCallback log callback}.
+     */
+    readonly system = "Lavalink Manager";
+    /**
+     * The {@link LogCallback log callback} used by the node.
+     */
+    private _log;
+    /**
+     * A value to use as `this` in the `this#_log`.
+     */
+    private _logThisArg?;
+    /**
      * Create a lavalink manager.
      * @param client The manager's Distype client.
      * @param options The {@link ManagerOptions options} to use for the manager.
      */
-    constructor(client: Client, options: ManagerOptions);
+    constructor(client: Client, options: ManagerOptions, logCallback?: LogCallback, logThisArg?: any);
     /**
      * Available nodes sorted by cpu load.
      */

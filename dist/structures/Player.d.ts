@@ -27,6 +27,10 @@ export interface PlayerEvents extends Record<string, (...args: any[]) => void> {
      * Emitted when the server sends a track stuck event.
      */
     TRACK_STUCK: (thresholdMs: number, track?: Track) => void;
+    /**
+     * When the node receives a voice websocket close. Note that `4014` close codes are not emitted.
+     */
+    WEBSOCKET_CLOSED: (code: number, reason: string, byRemote: boolean) => void;
 }
 /**
  * Filters to apply to tracks.
@@ -302,14 +306,15 @@ export declare class Player extends TypedEmitter<PlayerEvents> {
      */
     handleMove(data: GatewayVoiceStateUpdateDispatchData): Promise<void>;
     /**
+     * Handle incoming payloads from the attached node.
+     * @param payload The received payload.
+     * @internal
+     */
+    handlePayload(payload: any): Promise<void>;
+    /**
      * Advance the queue.
      */
     private _advanceQueue;
-    /**
-     * Handle incoming payloads from the attached node.
-     * @param payload The received payload.
-     */
-    private _handlePayload;
     /**
      * Helper function for sending play payloads to the server.
      * @param track The track to play.

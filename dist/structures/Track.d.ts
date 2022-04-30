@@ -9,17 +9,6 @@ export interface TrackData {
      */
     readonly track: string;
     /**
-     * Track information.
-     */
-    readonly info: TrackInfo;
-}
-/**
- * Track information from the server.
- * This is used internally when creating the Track class, and is not easily accessible by the user.
- * @internal
- */
-export interface TrackInfo {
-    /**
      * The track's identifier.
      */
     readonly identifier: string;
@@ -55,7 +44,7 @@ export interface TrackInfo {
 /**
  * A track.
  */
-export declare class Track implements TrackInfo {
+export declare class Track implements TrackData {
     /**
      * The track's requester.
      * This value can be anything, and solely exists for your convenience.

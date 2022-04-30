@@ -78,6 +78,11 @@ export interface NodeOptions {
         timeout: number;
     } | null;
     /**
+     * The number of milliseconds to wait between spawn and resume attempts.
+     * @default 2500
+     */
+    spawnAttemptDelay?: number;
+    /**
      * The maximum number of spawn attempts before rejecting.
      * @default 10
      */
