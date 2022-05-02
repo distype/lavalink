@@ -7,7 +7,7 @@ const Track_1 = require("./Track");
 const LavalinkConstants_1 = require("../utils/LavalinkConstants");
 const node_utils_1 = require("@br88c/node-utils");
 /**
- * The lavalink manager.
+ * The Lavalink manager.
  */
 class Manager extends node_utils_1.TypedEmitter {
     /**
@@ -40,10 +40,16 @@ class Manager extends node_utils_1.TypedEmitter {
             const node = new Node_1.Node(i, this, nodeOptions, logCallback, logThisArg);
             this.nodes.set(i, node);
             node.on(`RECEIVED_MESSAGE`, (payload) => {
+                this.emit(`NODE_RECEIVED_MESSAGE`, payload);
                 const player = this.players.get(payload.guildId);
                 if (player)
                     player.handlePayload(payload);
             });
+            node.on(`SENT_PAYLOAD`, (payload) => this.emit(`NODE_SENT_PAYLOAD`, payload));
+            node.on(`IDLE`, () => this.emit(`NODE_IDLE`, node));
+            node.on(`CONNECTING`, () => this.emit(`NODE_CONNECTING`, node));
+            node.on(`RUNNING`, () => this.emit(`NODE_RUNNING`, node));
+            node.on(`DISCONNECTED`, () => this.emit(`NODE_DISCONNECTED`, node));
         });
         this.client.gateway.on(`VOICE_SERVER_UPDATE`, this._handleVoiceServerUpdate.bind(this));
         this.client.gateway.on(`VOICE_STATE_UPDATE`, this._handleVoiceStateUpdate.bind(this));
@@ -82,6 +88,7 @@ class Manager extends node_utils_1.TypedEmitter {
             this._log(`${failed} nodes failed to spawn`, {
                 level: `WARN`, system: this.system
             });
+        this.emit(`NODES_READY`, success, failed);
     }
     /**
      * Create a new player.
@@ -101,6 +108,16 @@ class Manager extends node_utils_1.TypedEmitter {
             throw new Error(`No available nodes to bind the player to`);
         const player = new Player_1.Player(this, node, guild, textChannel, voiceChannel, options, this._log, this._logThisArg);
         this.players.set(guild, player);
+        player.on(`VOICE_CONNECTED`, (channel) => this.emit(`PLAYER_VOICE_CONNECTED`, player, channel));
+        player.on(`VOICE_MOVED`, (newChannel) => this.emit(`PLAYER_VOICE_MOVED`, player, newChannel));
+        player.on(`DESTROYED`, (reason) => this.emit(`PLAYER_DESTROYED`, player, reason));
+        player.on(`PAUSED`, () => this.emit(`PLAYER_PAUSED`, player));
+        player.on(`RESUMED`, () => this.emit(`PLAYER_RESUMED`, player));
+        player.on(`TRACK_END`, (reason, track) => this.emit(`PLAYER_TRACK_END`, player, reason, track));
+        player.on(`TRACK_EXCEPTION`, (message, severity, cause, track) => this.emit(`PLAYER_TRACK_EXCEPTION`, player, message, severity, cause, track));
+        player.on(`TRACK_START`, (track) => this.emit(`PLAYER_TRACK_START`, player, track));
+        player.on(`TRACK_STUCK`, (thresholdMs, track) => this.emit(`PLAYER_TRACK_STUCK`, player, thresholdMs, track));
+        player.on(`WEBSOCKET_CLOSED`, (code, reason, byRemote) => this.emit(`PLAYER_WEBSOCKET_CLOSED`, player, code, reason, byRemote));
         return player;
     }
     /**
@@ -166,6 +183,10 @@ class Manager extends node_utils_1.TypedEmitter {
             }));
         }
     }
+    /**
+     * Handle incoming voice server update payloads.
+     * @param payload The payload.
+     */
     _handleVoiceServerUpdate(payload) {
         const player = this.players.get(payload.d.guild_id);
         if (!player)
@@ -180,6 +201,10 @@ class Manager extends node_utils_1.TypedEmitter {
             event: payload.d
         }).catch(() => { });
     }
+    /**
+     * Handle incoming voice state updates.
+     * @param payload The payload.
+     */
     _handleVoiceStateUpdate(payload) {
         const player = this.players.get(payload.d.guild_id ?? ``);
         if (player && this.client.gateway.user?.id === payload.d.user_id)

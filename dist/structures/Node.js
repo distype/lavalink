@@ -15,11 +15,11 @@ var NodeState;
     NodeState[NodeState["DISCONNECTED"] = 3] = "DISCONNECTED";
 })(NodeState = exports.NodeState || (exports.NodeState = {}));
 /**
- * A lavalink node.
+ * A Lavalink node.
  */
 class Node extends node_utils_1.TypedEmitter {
     /**
-     * Create a lavalink node.
+     * Create a Lavalink node.
      * @param id The node's ID.
      * @param manager The node's {@link Manager manager}.
      * @param options The node's {@link NodeOptions options}.
@@ -151,10 +151,10 @@ class Node extends node_utils_1.TypedEmitter {
                     if (error)
                         reject(error);
                     else {
-                        this.emit(`SENT_PAYLOAD`, payload);
                         this._log(`Sent payload (opcode ${data.op})`, {
                             level: `DEBUG`, system: this.system
                         });
+                        this.emit(`SENT_PAYLOAD`, payload);
                         resolve();
                     }
                 });
@@ -226,10 +226,10 @@ class Node extends node_utils_1.TypedEmitter {
     _enterState(state) {
         if (this.state !== state) {
             this.state = state;
-            this.emit(NodeState[state]);
             this._log(NodeState[state], {
                 level: `DEBUG`, system: this.system
             });
+            this.emit(NodeState[state]);
         }
     }
     /**

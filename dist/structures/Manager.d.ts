@@ -39,9 +39,76 @@ export declare type ManagerSearchSource = (typeof LavalinkConstants.SOURCE_IDENT
 /**
  * {@link Manager} events.
  */
-export interface ManagerEvents extends Record<string, (...args: any[]) => void> {
-    READY: () => void;
-}
+export declare type ManagerEvents = {
+    /**
+     * When all {@link Node nodes} are spawned and ready.
+     */
+    NODES_READY: (success: number, failed: number) => void;
+    /**
+     * When a {@link Node node} receives a payload.
+     */
+    NODE_RECEIVED_MESSAGE: (payload: any) => void;
+    /**
+     * When a payload is sent.
+     */
+    NODE_SENT_PAYLOAD: (payload: string) => void;
+    /**
+     * When a {@link Node node} enters an {@link NodeState idle state}.
+     */
+    NODE_IDLE: (node: Node) => void;
+    /**
+     * When a {@link Node node} enters a {@link NodeState connecting state}.
+     */
+    NODE_CONNECTING: (node: Node) => void;
+    /**
+     * When a {@link Node node} enters a {@link NodeState running state}.
+     */
+    NODE_RUNNING: (node: Node) => void;
+    /**
+     * When a {@link Node node} enters a {@link NodeState disconnected state}.
+     */
+    NODE_DISCONNECTED: (node: Node) => void;
+    /**
+     * When a {@link Player player} connects to the first voice channel.
+     */
+    PLAYER_VOICE_CONNECTED: (player: Player, channel: Snowflake) => void;
+    /**
+     * When a the bot is moved to a different voice channel.
+     */
+    PLAYER_VOICE_MOVED: (player: Player, newChannel: Snowflake) => void;
+    /**
+     * When a {@link Player player} is destroyed.
+     */
+    PLAYER_DESTROYED: (player: Player, reason: string) => void;
+    /**
+     * When a {@link Player player} is paused.
+     */
+    PLAYER_PAUSED: (player: Player) => void;
+    /**
+     * When a {@link Player player} is resumed.
+     */
+    PLAYER_RESUMED: (player: Player) => void;
+    /**
+     * Emitted when a {@link Player player}'s {@link Node node} sends a track end event.
+     */
+    PLAYER_TRACK_END: (player: Player, reason: string, track?: Track) => void;
+    /**
+     * Emitted when a {@link Player player}'s {@link Node node} sends a track exception event.
+     */
+    PLAYER_TRACK_EXCEPTION: (player: Player, message: string, severity: string, cause: string, track?: Track) => void;
+    /**
+     * Emitted when a {@link Player player}'s {@link Node node} sends a track start event.
+     */
+    PLAYER_TRACK_START: (player: Player, track?: Track) => void;
+    /**
+     * Emitted when a {@link Player player}'s {@link Node node} sends a track stuck event.
+     */
+    PLAYER_TRACK_STUCK: (player: Player, thresholdMs: number, track?: Track) => void;
+    /**
+     * When a {@link Player player}'s {@link Node node} receives a voice websocket close. Note that `4014` close codes are not emitted.
+     */
+    PLAYER_WEBSOCKET_CLOSED: (player: Player, code: number, reason: string, byRemote: boolean) => void;
+};
 /**
  * {@link Manager} options.
  */
@@ -67,7 +134,7 @@ export interface ManagerOptions {
     leastLoadSort?: `system` | `lavalink`;
 }
 /**
- * The lavalink manager.
+ * The Lavalink manager.
  */
 export declare class Manager extends TypedEmitter<ManagerEvents> {
     /**
@@ -138,6 +205,14 @@ export declare class Manager extends TypedEmitter<ManagerEvents> {
      * @returns An array of the decoded tracks.
      */
     decodeTracks(...tracks: string[]): Promise<Track[]>;
+    /**
+     * Handle incoming voice server update payloads.
+     * @param payload The payload.
+     */
     private _handleVoiceServerUpdate;
+    /**
+     * Handle incoming voice state updates.
+     * @param payload The payload.
+     */
     private _handleVoiceStateUpdate;
 }

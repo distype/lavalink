@@ -6,13 +6,13 @@ import { request } from 'undici';
 /**
  * {@link Node} events.
  */
-export interface NodeEvents extends Record<string, (...args: any[]) => void> {
+export declare type NodeEvents = {
     /**
-     * When the {@link Node node} receives a payload. Data is the parsed payload.
+     * When the {@link Node node} receives a payload.
      */
     RECEIVED_MESSAGE: (payload: any) => void;
     /**
-     * When a payload is sent. Data is the sent payload.
+     * When a payload is sent.
      */
     SENT_PAYLOAD: (payload: string) => void;
     /**
@@ -31,7 +31,7 @@ export interface NodeEvents extends Record<string, (...args: any[]) => void> {
      * When the {@link Node node} enters a {@link NodeState disconnected state}.
      */
     DISCONNECTED: () => void;
-}
+};
 /**
  * {@link Node} options.
  */
@@ -73,7 +73,7 @@ export interface NodeOptions {
          */
         key: string;
         /**
-         * The time in milliseconds after the wrapper disconnects that the lavalink server's session should be closed anyways.
+         * The time in milliseconds after the wrapper disconnects that the Lavalink server's session should be closed anyways.
          */
         timeout: number;
     } | null;
@@ -118,7 +118,7 @@ export declare enum NodeState {
     DISCONNECTED = 3
 }
 /**
- * Statistics about a node sent from the lavalink server.
+ * Statistics about a node sent from the Lavalink server.
  */
 export interface NodeStats {
     /**
@@ -160,7 +160,7 @@ export interface NodeStats {
     };
 }
 /**
- * A lavalink node.
+ * A Lavalink node.
  */
 export declare class Node extends TypedEmitter<NodeEvents> {
     /**
@@ -204,7 +204,7 @@ export declare class Node extends TypedEmitter<NodeEvents> {
      */
     private _ws;
     /**
-     * Create a lavalink node.
+     * Create a Lavalink node.
      * @param id The node's ID.
      * @param manager The node's {@link Manager manager}.
      * @param options The node's {@link NodeOptions options}.

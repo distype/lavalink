@@ -5,9 +5,12 @@ import { LogCallback } from '../types/Log';
 import { TypedEmitter } from '@br88c/node-utils';
 import { GatewayVoiceStateUpdateDispatchData } from 'discord-api-types/v10';
 import { Snowflake } from 'distype';
-export interface PlayerEvents extends Record<string, (...args: any[]) => void> {
+/**
+ * {@link Player} events.
+ */
+export declare type PlayerEvents = {
     /**
-     * When the player connects to the first voice channel.
+     * When the {@link Player player} connects to the first voice channel.
      */
     VOICE_CONNECTED: (channel: Snowflake) => void;
     /**
@@ -15,38 +18,38 @@ export interface PlayerEvents extends Record<string, (...args: any[]) => void> {
      */
     VOICE_MOVED: (newChannel: Snowflake) => void;
     /**
-     * When the player is destroyed.
+     * When the {@link Player player} is destroyed.
      */
     DESTROYED: (reason: string) => void;
     /**
-     * When the player is paused.
+     * When the {@link Player player} is paused.
      */
     PAUSED: () => void;
     /**
-     * When the player is resumed.
+     * When the {@link Player player} is resumed.
      */
     RESUMED: () => void;
     /**
-     * Emitted when the node sends a track end event.
+     * Emitted when the {@link Player player}'s {@link Node node} sends a track end event.
      */
     TRACK_END: (reason: string, track?: Track) => void;
     /**
-     * Emitted when the node sends a track exception event.
+     * Emitted when the {@link Player player}'s {@link Node node} sends a track exception event.
      */
     TRACK_EXCEPTION: (message: string, severity: string, cause: string, track?: Track) => void;
     /**
-     * Emitted when the node sends a track start event.
+     * Emitted when the {@link Player player}'s {@link Node node} sends a track start event.
      */
     TRACK_START: (track?: Track) => void;
     /**
-     * Emitted when the node sends a track stuck event.
+     * Emitted when the {@link Player player}'s {@link Node node} sends a track stuck event.
      */
     TRACK_STUCK: (thresholdMs: number, track?: Track) => void;
     /**
-     * When the node receives a voice websocket close. Note that `4014` close codes are not emitted.
+     * When the {@link Player player}'s {@link Node node} receives a voice websocket close. Note that `4014` close codes are not emitted.
      */
     WEBSOCKET_CLOSED: (code: number, reason: string, byRemote: boolean) => void;
-}
+};
 /**
  * Filters to apply to tracks.
  * @see [Lavalink Docs](https://github.com/freyacodes/Lavalink/blob/dev/IMPLEMENTATION.md#using-filters)
@@ -98,7 +101,13 @@ export interface PlayerFilters {
         depth: number;
     };
 }
+/**
+ * A loop type for a {@link Player player}.
+ */
 export declare type PlayerLoopType = `off` | `single` | `queue`;
+/**
+ * {@link Player} options.
+ */
 export interface PlayerOptions {
     /**
      * The amount of time to allow to connect to a VC before timing out.
@@ -111,6 +120,9 @@ export interface PlayerOptions {
      */
     selfDeafen?: boolean;
 }
+/**
+ * Options for playing a track with the {@link Player player}.
+ */
 export interface PlayerPlayOptions {
     /**
      * The number of milliseconds to offset the track by.
@@ -141,6 +153,9 @@ export declare enum PlayerState {
     PAUSED = 2,
     PLAYING = 3
 }
+/**
+ * A Lavalink player.
+ */
 export declare class Player extends TypedEmitter<PlayerEvents> {
     /**
      * The player's {@link PlayerFilters filters}.
@@ -219,7 +234,7 @@ export declare class Player extends TypedEmitter<PlayerEvents> {
      */
     private _spinning;
     /**
-     * Create a lavalink player.
+     * Create a Lavalink player.
      * @param manager The player's {@link Manager manager}.
      * @param node The player's node.
      * @param guild The player's guild.
