@@ -10,13 +10,13 @@ import { RawData, WebSocket } from 'ws';
 /**
  * {@link Node} events.
  */
-export interface NodeEvents extends Record<string, (...args: any[]) => void> {
+export type NodeEvents = {
     /**
-     * When the {@link Node node} receives a payload. Data is the parsed payload.
+     * When the {@link Node node} receives a payload.
      */
     RECEIVED_MESSAGE: (payload: any) => void
     /**
-     * When a payload is sent. Data is the sent payload.
+     * When a payload is sent.
      */
     SENT_PAYLOAD: (payload: string) => void
     /**
@@ -78,7 +78,7 @@ export interface NodeOptions {
          */
         key: string
         /**
-         * The time in milliseconds after the wrapper disconnects that the lavalink server's session should be closed anyways.
+         * The time in milliseconds after the wrapper disconnects that the Lavalink server's session should be closed anyways.
          */
         timeout: number
     } | null
@@ -126,7 +126,7 @@ export enum NodeState {
 }
 
 /**
- * Statistics about a node sent from the lavalink server.
+ * Statistics about a node sent from the Lavalink server.
  */
 export interface NodeStats {
     /**
@@ -169,7 +169,7 @@ export interface NodeStats {
 }
 
 /**
- * A lavalink node.
+ * A Lavalink node.
  */
 export class Node extends TypedEmitter<NodeEvents> {
     /**
@@ -236,7 +236,7 @@ export class Node extends TypedEmitter<NodeEvents> {
     private _ws: WebSocket | null = null;
 
     /**
-     * Create a lavalink node.
+     * Create a Lavalink node.
      * @param id The node's ID.
      * @param manager The node's {@link Manager manager}.
      * @param options The node's {@link NodeOptions options}.
@@ -340,10 +340,12 @@ export class Node extends TypedEmitter<NodeEvents> {
                 this._ws.send(payload, (error) => {
                     if (error) reject(error);
                     else {
-                        this.emit(`SENT_PAYLOAD`, payload);
                         this._log(`Sent payload (opcode ${data.op})`, {
                             level: `DEBUG`, system: this.system
                         });
+
+                        this.emit(`SENT_PAYLOAD`, payload);
+
                         resolve();
                     }
                 });
@@ -421,10 +423,12 @@ export class Node extends TypedEmitter<NodeEvents> {
     private _enterState (state: NodeState): void {
         if (this.state !== state) {
             this.state = state;
-            (this.emit as (event: string) => void)(NodeState[state]);
+
             this._log(NodeState[state], {
                 level: `DEBUG`, system: this.system
             });
+
+            (this.emit as (event: string) => void)(NodeState[state]);
         }
     }
 

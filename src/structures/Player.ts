@@ -10,9 +10,12 @@ import { ChannelType, GatewayVoiceStateUpdateDispatchData } from 'discord-api-ty
 import { VoiceCloseCodes } from 'discord-api-types/voice/v4';
 import { PermissionsUtils, Snowflake } from 'distype';
 
-export interface PlayerEvents extends Record<string, (...args: any[]) => void> {
+/**
+ * {@link Player} events.
+ */
+export type PlayerEvents = {
     /**
-     * When the player connects to the first voice channel.
+     * When the {@link Player player} connects to the first voice channel.
      */
     VOICE_CONNECTED: (channel: Snowflake) => void
     /**
@@ -20,35 +23,35 @@ export interface PlayerEvents extends Record<string, (...args: any[]) => void> {
      */
     VOICE_MOVED: (newChannel: Snowflake) => void
     /**
-     * When the player is destroyed.
+     * When the {@link Player player} is destroyed.
      */
     DESTROYED: (reason: string) => void
     /**
-     * When the player is paused.
+     * When the {@link Player player} is paused.
      */
     PAUSED: () => void
     /**
-     * When the player is resumed.
+     * When the {@link Player player} is resumed.
      */
     RESUMED: () => void
     /**
-     * Emitted when the node sends a track end event.
+     * Emitted when the {@link Player player}'s {@link Node node} sends a track end event.
      */
     TRACK_END: (reason: string, track?: Track) => void
     /**
-     * Emitted when the node sends a track exception event.
+     * Emitted when the {@link Player player}'s {@link Node node} sends a track exception event.
      */
     TRACK_EXCEPTION: (message: string, severity: string, cause: string, track?: Track) => void
     /**
-     * Emitted when the node sends a track start event.
+     * Emitted when the {@link Player player}'s {@link Node node} sends a track start event.
      */
     TRACK_START: (track?: Track) => void
     /**
-     * Emitted when the node sends a track stuck event.
+     * Emitted when the {@link Player player}'s {@link Node node} sends a track stuck event.
      */
     TRACK_STUCK: (thresholdMs: number, track?: Track) => void
     /**
-     * When the node receives a voice websocket close. Note that `4014` close codes are not emitted.
+     * When the {@link Player player}'s {@link Node node} receives a voice websocket close. Note that `4014` close codes are not emitted.
      */
     WEBSOCKET_CLOSED: (code: number, reason: string, byRemote: boolean) => void
 }
@@ -102,8 +105,14 @@ export interface PlayerFilters {
     }
 }
 
+/**
+ * A loop type for a {@link Player player}.
+ */
 export type PlayerLoopType = `off` | `single` | `queue`;
 
+/**
+ * {@link Player} options.
+ */
 export interface PlayerOptions {
     /**
      * The amount of time to allow to connect to a VC before timing out.
@@ -117,6 +126,9 @@ export interface PlayerOptions {
     selfDeafen?: boolean
 }
 
+/**
+ * Options for playing a track with the {@link Player player}.
+ */
 export interface PlayerPlayOptions {
     /**
      * The number of milliseconds to offset the track by.
@@ -149,6 +161,9 @@ export enum PlayerState {
     PLAYING
 }
 
+/**
+ * A Lavalink player.
+ */
 export class Player extends TypedEmitter<PlayerEvents> {
     /**
      * The player's {@link PlayerFilters filters}.
@@ -230,7 +245,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
     private _spinning = false;
 
     /**
-     * Create a lavalink player.
+     * Create a Lavalink player.
      * @param manager The player's {@link Manager manager}.
      * @param node The player's node.
      * @param guild The player's guild.
@@ -421,10 +436,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
             });
         });
 
-        this.emit(`DESTROYED`, reason);
         this._log(`DESTROYED: ${reason}`, {
             level: `DEBUG`, system: this.system
         });
+        this.emit(`DESTROYED`, reason);
 
         this.removeAllListeners();
         this.manager.players.delete(this.guild);
@@ -510,10 +525,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
         });
 
         this.state = PlayerState.PAUSED;
-        this.emit(`PAUSED`);
         this._log(`PAUSED`, {
             level: `DEBUG`, system: this.system
         });
+        this.emit(`PAUSED`);
     }
 
     /**
@@ -529,10 +544,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
         });
 
         this.state = PlayerState.PLAYING;
-        this.emit(`RESUMED`);
         this._log(`RESUMED`, {
             level: `DEBUG`, system: this.system
         });
+        this.emit(`RESUMED`);
     }
 
     /**
@@ -629,10 +644,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
     public async handleMove (data: GatewayVoiceStateUpdateDispatchData): Promise<void> {
         if (this.state === PlayerState.DISCONNECTED) {
             if (data.channel_id === this.voiceChannel) {
-                this.emit(`VOICE_CONNECTED`, this.voiceChannel);
                 this._log(`VOICE_CONNECTED: Channel ${this.voiceChannel}`, {
                     level: `DEBUG`, system: this.system
                 });
+                this.emit(`VOICE_CONNECTED`, this.voiceChannel);
             } else this.destroy(`Connected to incorrect channel`);
         } else {
             if (data.channel_id === null) return this.destroy(`Disconnected from the voice channel`);
@@ -641,10 +656,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
             if (this.voiceChannel !== data.channel_id) {
                 this.voiceChannel = data.channel_id;
 
-                this.emit(`VOICE_MOVED`, this.voiceChannel);
                 this._log(`VOICE_MOVED: New channel ${this.voiceChannel}`, {
                     level: `DEBUG`, system: this.system
                 });
+                this.emit(`VOICE_MOVED`, this.voiceChannel);
 
                 permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel).catch((error) => {
                     this.destroy(`Unable to get self permissions in the new voice channel: ${(error?.message ?? error) ?? `Unknown reason`}`);
@@ -756,10 +771,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
                     this.trackPosition = null;
                     this.state = PlayerState.CONNECTED;
 
-                    this.emit(`TRACK_END`, payload.reason, track);
                     this._log(`TRACK_END: ${payload.reason} (${track.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
+                    this.emit(`TRACK_END`, payload.reason, track);
 
                     if (payload.reason !== `STOPPED` && payload.reason !== `REPLACED`) {
                         this._advanceQueue().catch((error) => {
@@ -773,38 +788,38 @@ export class Player extends TypedEmitter<PlayerEvents> {
                 }
 
                 case `TrackExceptionEvent`: {
-                    this.emit(`TRACK_EXCEPTION`, payload.exception.message, payload.exception.severity, payload.exception.cause, track);
                     this._log(`TRACK_EXCEPTION: ${payload.exception.message} (Severity ${payload.exception.severity}, track ${track.identifier}), caused by "${payload.exception.cause}"`, {
                         level: `DEBUG`, system: this.system
                     });
+                    this.emit(`TRACK_EXCEPTION`, payload.exception.message, payload.exception.severity, payload.exception.cause, track);
 
                     break;
                 }
 
                 case `TrackStartEvent`: {
-                    this.emit(`TRACK_START`, track);
                     this._log(`TRACK_START (${track.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
+                    this.emit(`TRACK_START`, track);
 
                     if (this._sentPausedPlay) {
                         this._sentPausedPlay = null;
 
                         this.state = PlayerState.PAUSED;
-                        this.emit(`PAUSED`);
                         this._log(`PAUSED`, {
                             level: `DEBUG`, system: this.system
                         });
+                        this.emit(`PAUSED`);
                     } else this.state = PlayerState.PLAYING;
 
                     break;
                 }
 
                 case `TrackStuckEvent`: {
-                    this.emit(`TRACK_STUCK`, payload.thresholdMs, track);
-                    this._log(`TRACK_END: Threshold ${payload.thresholdMs}ms (${track.identifier})`, {
+                    this._log(`TRACK_STUCK: Threshold ${payload.thresholdMs}ms (${track.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
+                    this.emit(`TRACK_STUCK`, payload.thresholdMs, track);
 
                     await this._stop().catch((error) => {
                         this._log(`Unable to stop the current track after TRACK_STUCK: ${(error?.message ?? error) ?? `Unknown reason`}`, {
@@ -823,10 +838,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
 
                 case `WebSocketClosedEvent`: {
                     if (payload.code !== VoiceCloseCodes.Disconnected) {
-                        this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
                         this._log(`WEBSOCKET_CLOSED: Code ${payload.code}, "${payload.reason}"${payload.byRemove ? `, by remote` : ``}`, {
                             level: `DEBUG`, system: this.system
                         });
+                        this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
 
                         this.destroy(`Disconnected with code ${payload.code}: "${payload.reason}"`);
                     }

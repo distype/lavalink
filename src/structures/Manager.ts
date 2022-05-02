@@ -45,8 +45,75 @@ export type ManagerSearchSource = (typeof LavalinkConstants.SOURCE_IDENTIFIERS)[
 /**
  * {@link Manager} events.
  */
-export interface ManagerEvents extends Record<string, (...args: any[]) => void> {
-    READY: () => void
+export type ManagerEvents = {
+    /**
+     * When all {@link Node nodes} are spawned and ready.
+     */
+    NODES_READY: (success: number, failed: number) => void
+    /**
+     * When a {@link Node node} receives a payload.
+     */
+    NODE_RECEIVED_MESSAGE: (payload: any) => void
+    /**
+     * When a payload is sent.
+     */
+    NODE_SENT_PAYLOAD: (payload: string) => void
+    /**
+     * When a {@link Node node} enters an {@link NodeState idle state}.
+     */
+    NODE_IDLE: (node: Node) => void
+    /**
+     * When a {@link Node node} enters a {@link NodeState connecting state}.
+     */
+    NODE_CONNECTING: (node: Node) => void
+    /**
+     * When a {@link Node node} enters a {@link NodeState running state}.
+     */
+    NODE_RUNNING: (node: Node) => void
+    /**
+     * When a {@link Node node} enters a {@link NodeState disconnected state}.
+     */
+    NODE_DISCONNECTED: (node: Node) => void
+    /**
+     * When a {@link Player player} connects to the first voice channel.
+     */
+    PLAYER_VOICE_CONNECTED: (player: Player, channel: Snowflake) => void
+    /**
+     * When a the bot is moved to a different voice channel.
+     */
+    PLAYER_VOICE_MOVED: (player: Player, newChannel: Snowflake) => void
+    /**
+     * When a {@link Player player} is destroyed.
+     */
+    PLAYER_DESTROYED: (player: Player, reason: string) => void
+    /**
+     * When a {@link Player player} is paused.
+     */
+    PLAYER_PAUSED: (player: Player) => void
+    /**
+     * When a {@link Player player} is resumed.
+     */
+    PLAYER_RESUMED: (player: Player) => void
+    /**
+     * Emitted when a {@link Player player}'s {@link Node node} sends a track end event.
+     */
+    PLAYER_TRACK_END: (player: Player, reason: string, track?: Track) => void
+    /**
+     * Emitted when a {@link Player player}'s {@link Node node} sends a track exception event.
+     */
+    PLAYER_TRACK_EXCEPTION: (player: Player, message: string, severity: string, cause: string, track?: Track) => void
+    /**
+     * Emitted when a {@link Player player}'s {@link Node node} sends a track start event.
+     */
+    PLAYER_TRACK_START: (player: Player, track?: Track) => void
+    /**
+     * Emitted when a {@link Player player}'s {@link Node node} sends a track stuck event.
+     */
+    PLAYER_TRACK_STUCK: (player: Player, thresholdMs: number, track?: Track) => void
+    /**
+     * When a {@link Player player}'s {@link Node node} receives a voice websocket close. Note that `4014` close codes are not emitted.
+     */
+    PLAYER_WEBSOCKET_CLOSED: (player: Player, code: number, reason: string, byRemote: boolean) => void
 }
 
 /**
@@ -75,7 +142,7 @@ export interface ManagerOptions {
 }
 
 /**
- * The lavalink manager.
+ * The Lavalink manager.
  */
 export class Manager extends TypedEmitter<ManagerEvents> {
     /**
@@ -130,9 +197,16 @@ export class Manager extends TypedEmitter<ManagerEvents> {
             this.nodes.set(i, node);
 
             node.on(`RECEIVED_MESSAGE`, (payload) => {
+                this.emit(`NODE_RECEIVED_MESSAGE`, payload);
+
                 const player = this.players.get(payload.guildId);
                 if (player) player.handlePayload(payload);
             });
+            node.on(`SENT_PAYLOAD`, (payload) => this.emit(`NODE_SENT_PAYLOAD`, payload));
+            node.on(`IDLE`, () => this.emit(`NODE_IDLE`, node));
+            node.on(`CONNECTING`, () => this.emit(`NODE_CONNECTING`, node));
+            node.on(`RUNNING`, () => this.emit(`NODE_RUNNING`, node));
+            node.on(`DISCONNECTED`, () => this.emit(`NODE_DISCONNECTED`, node));
         });
 
         this.client.gateway.on(`VOICE_SERVER_UPDATE`, this._handleVoiceServerUpdate.bind(this));
@@ -177,6 +251,8 @@ export class Manager extends TypedEmitter<ManagerEvents> {
         if (failed > 0) this._log(`${failed} nodes failed to spawn`, {
             level: `WARN`, system: this.system
         });
+
+        this.emit(`NODES_READY`, success, failed);
     }
 
     /**
@@ -197,6 +273,18 @@ export class Manager extends TypedEmitter<ManagerEvents> {
 
         const player = new Player(this, node, guild, textChannel, voiceChannel, options, this._log, this._logThisArg);
         this.players.set(guild, player);
+
+        player.on(`VOICE_CONNECTED`, (channel) => this.emit(`PLAYER_VOICE_CONNECTED`, player, channel));
+        player.on(`VOICE_MOVED`, (newChannel) => this.emit(`PLAYER_VOICE_MOVED`, player, newChannel));
+        player.on(`DESTROYED`, (reason) => this.emit(`PLAYER_DESTROYED`, player, reason));
+        player.on(`PAUSED`, () => this.emit(`PLAYER_PAUSED`, player));
+        player.on(`RESUMED`, () => this.emit(`PLAYER_RESUMED`, player));
+        player.on(`TRACK_END`, (reason, track) => this.emit(`PLAYER_TRACK_END`, player, reason, track));
+        player.on(`TRACK_EXCEPTION`, (message, severity, cause, track) => this.emit(`PLAYER_TRACK_EXCEPTION`, player, message, severity, cause, track));
+        player.on(`TRACK_START`, (track) => this.emit(`PLAYER_TRACK_START`, player, track));
+        player.on(`TRACK_STUCK`, (thresholdMs, track) => this.emit(`PLAYER_TRACK_STUCK`, player, thresholdMs, track));
+        player.on(`WEBSOCKET_CLOSED`, (code, reason, byRemote) => this.emit(`PLAYER_WEBSOCKET_CLOSED`, player, code, reason, byRemote));
+
         return player;
     }
 
@@ -264,6 +352,10 @@ export class Manager extends TypedEmitter<ManagerEvents> {
         }
     }
 
+    /**
+     * Handle incoming voice server update payloads.
+     * @param payload The payload.
+     */
     private _handleVoiceServerUpdate (payload: GatewayVoiceServerUpdateDispatch): void {
         const player = this.players.get(payload.d.guild_id);
         if (!player) return;
@@ -279,6 +371,10 @@ export class Manager extends TypedEmitter<ManagerEvents> {
         }).catch(() => {});
     }
 
+    /**
+     * Handle incoming voice state updates.
+     * @param payload The payload.
+     */
     private _handleVoiceStateUpdate (payload: GatewayVoiceStateUpdateDispatch): void {
         const player = this.players.get(payload.d.guild_id ?? ``);
         if (player && this.client.gateway.user?.id === payload.d.user_id) player.handleMove(payload.d);
