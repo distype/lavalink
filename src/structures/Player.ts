@@ -2,6 +2,7 @@ import { Manager } from './Manager';
 import { Node } from './Node';
 import { Track } from './Track';
 
+import { DistypeLavalinkError, DistypeLavalinkErrorType } from '../errors/DistypeLavalinkError';
 import { LogCallback } from '../types/Log';
 import { LavalinkConstants } from '../utils/LavalinkConstants';
 
@@ -300,17 +301,17 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * Connect to the voice channel.
      */
     public async connect (): Promise<void> {
-        if (this._spinning) throw new Error(`Player is already connecting`);
+        if (this._spinning) throw new DistypeLavalinkError(`Player is already connecting`, DistypeLavalinkErrorType.PLAYER_ALREADY_CONNECTING, this.system);
         if (this.state >= PlayerState.CONNECTED) return;
 
         const permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
         if (!PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.VOICE)) {
-            throw new Error(`Missing one of the following permissions to join the voice channel: "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.VOICE).join(`, `)}"`);
+            throw new DistypeLavalinkError(`Missing one of the following permissions to join the voice channel: "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.VOICE).join(`, `)}"`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
 
         const voiceChannel = await this.manager.client.getChannelData(this.voiceChannel, `type`);
         if (voiceChannel.type === ChannelType.GuildStageVoice && !PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
-            throw new Error(`Missing one of the following permissions to join the stage channel: "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER).join(`, `)}" or "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST).join(`, `)}"`);
+            throw new DistypeLavalinkError(`Missing one of the following permissions to join the stage channel: "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER).join(`, `)}" or "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST).join(`, `)}"`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
 
         this._spinning = true;
@@ -366,14 +367,14 @@ export class Player extends TypedEmitter<PlayerEvents> {
                 this.removeListener(`VOICE_CONNECTED`, onConnected);
                 if (timedOut) clearTimeout(timedOut);
                 this._spinning = false;
-                reject(new Error(`Failed to connect to the voice channel, Player was destroyed: ${reason}`));
+                reject(new DistypeLavalinkError(`Failed to connect to the voice channel, Player was destroyed: ${reason}`, DistypeLavalinkErrorType.PLAYER_VOICE_CONNECTION_FAILED, this.system));
             };
 
             const timedOut = setTimeout(() => {
                 this.removeListener(`VOICE_CONNECTED`, onConnected);
                 this.removeListener(`DESTROYED`, onDestroy);
                 this._spinning = false;
-                reject(new Error(`Timed out while connecting to the voice channel`));
+                reject(new DistypeLavalinkError(`Timed out while connecting to the voice channel`, DistypeLavalinkErrorType.PLAYER_VOICE_CONNECTION_FAILED, this.system));
             }, this.options.connectionTimeout);
 
             this.once(`VOICE_CONNECTED`, onConnected);
@@ -397,7 +398,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * @returns The track played.
      */
     public async play (track: Track | Track[], options?: PlayerPlayOptions): Promise<void> {
-        if (this.state < PlayerState.CONNECTED) throw new Error(`Cannot play when the player isn't in a connected, paused, or playing state`);
+        if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot play when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
         if (track instanceof Array) {
             this.queue.push(...track);
@@ -450,12 +451,12 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * @param index The index to skip to.
      */
     public async skip (index?: number): Promise<void> {
-        if (this.state < PlayerState.CONNECTED) throw new Error(`Cannot skip when the player isn't in a connected, paused, or playing state`);
+        if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot skip when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
         await this._stop();
 
         if (typeof index === `number`) {
-            if (index < 0 || index >= this.queue.length) throw new Error(`Invalid index`);
+            if (index < 0 || index >= this.queue.length) throw new DistypeLavalinkError(`Invalid index`, DistypeLavalinkErrorType.PLAYER_INVALID_SKIP_POSITION, this.system);
             await this._play(this.queue[index]);
             this.queuePosition = index;
 
@@ -475,7 +476,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * Shuffles the queue and starts playing the first track.
      */
     public async shuffle (): Promise<void> {
-        if (this.state < PlayerState.CONNECTED) throw new Error(`Cannot shuffle when the player isn't in a connected, paused, or playing state`);
+        if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot shuffle when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
         await this._stop();
 
@@ -497,9 +498,9 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * @param position The position in the track to seek to, in milliseconds.
      */
     public async seek (position: number): Promise<void> {
-        if (this.state < PlayerState.CONNECTED) throw new Error(`Cannot seek when the player isn't in a connected, paused, or playing state`);
+        if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot seek when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
-        if (position < 0) throw new Error(`Position must be greater than 0`);
+        if (position < 0) throw new DistypeLavalinkError(`Position must be greater than 0`, DistypeLavalinkErrorType.PLAYER_INVALID_SEEK_POSITION, this.system);
 
         await this.node.send({
             op: `seek`,
@@ -516,7 +517,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * Pause a track.
      */
     public async pause (): Promise<void> {
-        if (this.state < PlayerState.CONNECTED) throw new Error(`Cannot pause when the player isn't in a connected, paused, or playing state`);
+        if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot pause when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
         await this.node.send({
             op: `pause`,
@@ -535,7 +536,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * Resume a track.
      */
     public async resume (): Promise<void> {
-        if (this.state < PlayerState.CONNECTED) throw new Error(`Cannot resume when the player isn't in a connected, paused, or playing state`);
+        if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot resume when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
         await this.node.send({
             op: `pause`,
@@ -554,7 +555,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * Stop the player.
      */
     public async stop (): Promise<void> {
-        if (this.state < PlayerState.CONNECTED) throw new Error(`Cannot stop when the player isn't in a connected, paused, or playing state`);
+        if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot stop when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
         await this._stop();
 
@@ -606,9 +607,9 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * @param volume The volume to set the player to. Must be between 0 and 1000, inclusive.
      */
     public async setVolume (volume: number): Promise<void> {
-        if (this.state < PlayerState.CONNECTED) throw new Error(`Cannot set volume when the player isn't in a connected, paused, or playing state`);
+        if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot set volume when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
-        if (volume < 0 || volume > 1000) throw new Error(`Volume must be between 0 and 1000`);
+        if (volume < LavalinkConstants.VOLUME.MIN || volume > LavalinkConstants.VOLUME.MAX) throw new DistypeLavalinkError(`Volume must be between ${LavalinkConstants.VOLUME.MIN} and ${LavalinkConstants.VOLUME.MAX}`, DistypeLavalinkErrorType.PLAYER_VOLUME_OUT_OF_RANGE, this.system);
 
         await this.node.send({
             op: `volume`,
@@ -625,7 +626,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * @see [Lavalink Docs](https://github.com/freyacodes/Lavalink/blob/dev/IMPLEMENTATION.md#using-filters)
      */
     public async setFilters (filters: PlayerFilters): Promise<void> {
-        if (this.state < PlayerState.CONNECTED) throw new Error(`Cannot set filters when the player isn't in a connected, paused, or playing state`);
+        if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot set filters when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
         await this.node.send(Object.assign({
             op: `filters`,
@@ -907,13 +908,13 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * @param options Options to use in the play payload.
      */
     private async _play (track: Track, options?: PlayerPlayOptions): Promise<void> {
-        if (this.state !== PlayerState.CONNECTED && this.state !== PlayerState.PAUSED && this.state !== PlayerState.PLAYING) throw new Error(`Cannot play when the player isn't in a connected, paused, or playing state`);
+        if (this.state !== PlayerState.CONNECTED && this.state !== PlayerState.PAUSED && this.state !== PlayerState.PLAYING) throw new DistypeLavalinkError(`Cannot play when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
         if (typeof options?.volume === `number`) {
-            if (options.volume < 0 || options.volume > 1000) throw new Error(`Volume must be between 0 and 1000`);
+            if (options.volume < LavalinkConstants.VOLUME.MIN || options.volume > LavalinkConstants.VOLUME.MAX) throw new DistypeLavalinkError(`Volume must be between ${LavalinkConstants.VOLUME.MIN} and ${LavalinkConstants.VOLUME.MAX}`, DistypeLavalinkErrorType.PLAYER_VOLUME_OUT_OF_RANGE, this.system);
             this.volume = options.volume;
-            if (options.volume === 100) delete options.volume;
-        } else if (this.volume !== 100) options = Object.assign(options ?? {}, { volume: this.volume });
+            if (options.volume === LavalinkConstants.VOLUME.DEFAULT) delete options.volume;
+        } else if (this.volume !== LavalinkConstants.VOLUME.DEFAULT) options = Object.assign(options ?? {}, { volume: this.volume });
 
         if (this._isStage && !this._isSpeaker) options = Object.assign(options ?? {}, { pause: true });
 

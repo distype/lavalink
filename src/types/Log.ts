@@ -1,4 +1,4 @@
-import { Snowflake } from 'distype';
+import { DistypeLavalinkErrorSystem } from '../errors/DistypeLavalinkError';
 
 /**
  * A callback for logging events.
@@ -27,4 +27,4 @@ export interface LogMessageOptions {
 /**
  * A system that created a log.
  */
-export type LogSystem = `Lavalink Manager` | `Lavalink Node ${number}` | `Lavalink Player ${Snowflake}`;
+export type LogSystem = DistypeLavalinkErrorSystem;

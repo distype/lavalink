@@ -1,5 +1,6 @@
 import { Manager } from './Manager';
 
+import { DistypeLavalinkError, DistypeLavalinkErrorType } from '../errors/DistypeLavalinkError';
 import { LogCallback } from '../types/Log';
 
 import { TypedEmitter, wait } from '@br88c/node-utils';
@@ -126,7 +127,7 @@ export enum NodeState {
 }
 
 /**
- * Statistics about a node sent from the Lavalink server.
+ * Statistics about a {@link Node node} sent from the Lavalink server.
  */
 export interface NodeStats {
     /**
@@ -269,7 +270,7 @@ export class Node extends TypedEmitter<NodeEvents> {
      * The node must be in a {@link NodeState DISCONNECTED} state.
      */
     public async spawn (): Promise<void> {
-        if (this._spinning) throw new Error(`Node is already connecting`);
+        if (this._spinning) throw new DistypeLavalinkError(`Node is already connecting`, DistypeLavalinkErrorType.NODE_ALREADY_CONNECTING, this.system);
 
         this._spinning = true;
         this._killed = false;
@@ -297,7 +298,7 @@ export class Node extends TypedEmitter<NodeEvents> {
                 this._log(`Spawning interrupted by kill`, {
                     level: `DEBUG`, system: this.system
                 });
-                throw new Error(`Node spawn attempts interrupted by kill`);
+                throw new DistypeLavalinkError(`Node spawn attempts interrupted by kill`, DistypeLavalinkErrorType.NODE_INTERRUPT_FROM_KILL, this.system);
             }
 
             if (i < this.options.spawnMaxAttempts - 1) {
@@ -307,7 +308,7 @@ export class Node extends TypedEmitter<NodeEvents> {
 
         this._spinning = false;
         this._enterState(NodeState.IDLE);
-        throw new Error(`Failed to spawn node after ${this.options.spawnMaxAttempts} attempts`);
+        throw new DistypeLavalinkError(`Failed to spawn node after ${this.options.spawnMaxAttempts} attempts`, DistypeLavalinkErrorType.NODE_MAX_SPAWN_ATTEMPTS_REACHED, this.system);
     }
 
     /**
@@ -335,7 +336,7 @@ export class Node extends TypedEmitter<NodeEvents> {
 
         return await new Promise((resolve, reject) => {
             if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
-                reject(new Error(`Cannot send data when the socket is not in an OPEN state`));
+                reject(new DistypeLavalinkError(`Cannot send data when the socket is not in an OPEN state`, DistypeLavalinkErrorType.NODE_SEND_WITHOUT_OPEN_SOCKET, this.system));
             } else {
                 this._ws.send(payload, (error) => {
                     if (error) reject(error);
@@ -388,9 +389,9 @@ export class Node extends TypedEmitter<NodeEvents> {
             }) : undefined
         }));
 
-        if (typeof unableToParse === `string`) throw new Error(`Unable to parse response body: "${unableToParse}"`);
+        if (typeof unableToParse === `string`) throw new DistypeLavalinkError(`Unable to parse response body: "${unableToParse}"`, DistypeLavalinkErrorType.NODE_REST_UNABLE_TO_PARSE_RESPONSE_BODY, this.system);
 
-        if (res.statusCode >= 400) throw new Error(`REST status code ${res.statusCode}`);
+        if (res.statusCode >= 400) throw new DistypeLavalinkError(`REST status code ${res.statusCode}`, DistypeLavalinkErrorType.NODE_REST_REQUEST_ERROR, this.system);
 
         return res.body;
     }
@@ -436,7 +437,7 @@ export class Node extends TypedEmitter<NodeEvents> {
      * Initiate the socket.
      */
     private async _initSocket (): Promise<void> {
-        if (!this.manager.client.gateway.user) throw new Error(`Gateway user is not defined`);
+        if (!this.manager.client.gateway.user) throw new DistypeLavalinkError(`Gateway user is not defined`, DistypeLavalinkErrorType.DISTYPE_GATEWAY_USER_UNDEFINED, this.system);
 
         if (this.state !== NodeState.IDLE && this.state !== NodeState.DISCONNECTED) {
             this._close(1000, `Restarting`);
@@ -459,7 +460,7 @@ export class Node extends TypedEmitter<NodeEvents> {
 
             this._ws = new WebSocket(`ws${this.options.location.secure ? `s` : ``}://${this.options.location.host}:${this.options.location.port}/`, { headers });
 
-            this._ws.once(`close`, (code, reason) => reject(new Error(`Socket closed with code ${code}: "${this._parsePayload(reason)}"`)));
+            this._ws.once(`close`, (code, reason) => reject(new DistypeLavalinkError(`Socket closed with code ${code}: "${this._parsePayload(reason)}"`, DistypeLavalinkErrorType.NODE_CLOSED_DURING_SOCKET_INIT, this.system)));
             this._ws.once(`error`, (error) => reject(error));
 
             this._ws.once(`open`, () => {

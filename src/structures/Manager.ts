@@ -2,6 +2,7 @@ import { Node, NodeOptions, NodeState } from './Node';
 import { Player, PlayerOptions } from './Player';
 import { Track } from './Track';
 
+import { DistypeLavalinkError, DistypeLavalinkErrorType } from '../errors/DistypeLavalinkError';
 import { LogCallback } from '../types/Log';
 import { LavalinkConstants } from '../utils/LavalinkConstants';
 
@@ -269,7 +270,7 @@ export class Manager extends TypedEmitter<ManagerEvents> {
         if (existing) return existing;
 
         const node = this.availableNodes[0];
-        if (!node) throw new Error(`No available nodes to bind the player to`);
+        if (!node) throw new DistypeLavalinkError(`No available nodes to bind the player to`, DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
 
         const player = new Player(this, node, guild, textChannel, voiceChannel, options, this._log, this._logThisArg);
         this.players.set(guild, player);
@@ -298,11 +299,11 @@ export class Manager extends TypedEmitter<ManagerEvents> {
      */
     public async search (query: string, requester?: string, source?: ManagerSearchSource): Promise<ManagerSearchResult> {
         const searchNode = this.availableNodes[0];
-        if (!searchNode) throw new Error(`No nodes are available to perform a search`);
+        if (!searchNode) throw new DistypeLavalinkError(`No nodes are available to perform a search`, DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
 
-        const res = await searchNode.request(`GET`, `/loadtracks`, { query: { identifier: LavalinkConstants.URL_REGEX.test(query) ? query : `${source ?? this.options.defaultSearchSource}search:${query}` } });
+        const res = await searchNode.request(`GET`, `/loadtracks`, { query: { identifier: /^https?:\/\//.test(query) ? query : `${source ?? this.options.defaultSearchSource}search:${query}` } });
 
-        if (!res) throw new Error(`No search response data`);
+        if (!res) throw new DistypeLavalinkError(`No search response data`, DistypeLavalinkErrorType.MANAGER_NO_RESPONSE_DATA, this.system);
 
         const searchResult: ManagerSearchResult = {
             loadType: res.loadType,
@@ -330,12 +331,12 @@ export class Manager extends TypedEmitter<ManagerEvents> {
      */
     public async decodeTracks (...tracks: string[]): Promise<Track[]> {
         const decodeNode = this.availableNodes[0];
-        if (!decodeNode) throw new Error(`No nodes are available to decode tracks`);
+        if (!decodeNode) throw new DistypeLavalinkError(`No nodes are available to decode tracks`, DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
 
-        if (!tracks.length) throw new Error(`You must provide at least 1 track to decode`);
+        if (!tracks.length) throw new TypeError(`You must provide at least 1 track to decode`);
         else if (tracks.length === 1) {
             const res = await decodeNode.request(`GET`, `/decodetrack`, { query: { track: tracks[0] } });
-            if (typeof res !== `object` || res === null) throw new Error(`No decode response data`);
+            if (typeof res !== `object` || res === null) throw new DistypeLavalinkError(`No decode response data`, DistypeLavalinkErrorType.MANAGER_NO_RESPONSE_DATA, this.system);
             return [
                 new Track({
                     track: tracks[0],
@@ -344,7 +345,7 @@ export class Manager extends TypedEmitter<ManagerEvents> {
             ];
         } else {
             const res = await decodeNode.request(`POST`, `/decodetracks`, { body: tracks });
-            if (!Array.isArray(res)) throw new Error(`No decode response data`);
+            if (!Array.isArray(res)) throw new DistypeLavalinkError(`No decode response data`, DistypeLavalinkErrorType.MANAGER_NO_RESPONSE_DATA, this.system);
             return res.map((data) => new Track({
                 track: data.track,
                 ...data.info
