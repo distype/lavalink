@@ -305,13 +305,13 @@ export class Player extends TypedEmitter<PlayerEvents> {
         if (this.state >= PlayerState.CONNECTED) return;
 
         const permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
-        if (!PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.VOICE)) {
-            throw new DistypeLavalinkError(`Missing one of the following permissions to join the voice channel: "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.VOICE).join(`, `)}"`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+        if (!LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
+            throw new DistypeLavalinkError(`Missing one of the following permissions to join the voice channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
 
         const voiceChannel = await this.manager.client.getChannelData(this.voiceChannel, `type`);
-        if (voiceChannel.type === ChannelType.GuildStageVoice && !PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
-            throw new DistypeLavalinkError(`Missing one of the following permissions to join the stage channel: "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER).join(`, `)}" or "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST).join(`, `)}"`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+        if (voiceChannel.type === ChannelType.GuildStageVoice && !LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => PermissionsUtils.hasPerm(permissions, perm)) && !LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
+            throw new DistypeLavalinkError(`Missing one of the following permissions to join the stage channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
 
         this._spinning = true;
@@ -330,7 +330,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
                 if (voiceChannel.type === ChannelType.GuildStageVoice) {
                     this._isStage = true;
 
-                    if (PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER)) {
+                    if (LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             suppress: false
@@ -653,7 +653,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
         } else {
             if (data.channel_id === null) return this.destroy(`Disconnected from the voice channel`);
 
-            let permissions;
+            let permissions: bigint;
             if (this.voiceChannel !== data.channel_id) {
                 this.voiceChannel = data.channel_id;
 
@@ -664,8 +664,9 @@ export class Player extends TypedEmitter<PlayerEvents> {
 
                 permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel).catch((error) => {
                     this.destroy(`Unable to get self permissions in the new voice channel: ${(error?.message ?? error) ?? `Unknown reason`}`);
+                    return -1n;
                 });
-                if (typeof permissions !== `bigint`) return;
+                if (permissions === -1n) return;
 
                 const channel = await this.manager.client.getChannelData(this.voiceChannel, `type`).catch((error) => {
                     this.destroy(`Unable to get data for the new voice channel: ${(error?.message ?? error) ?? `Unknown reason`}`);
@@ -676,16 +677,16 @@ export class Player extends TypedEmitter<PlayerEvents> {
                     this._isStage = true;
                     this._isSpeaker = data.suppress;
 
-                    if (!PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
-                        return this.destroy(`Missing one of the following permissions in the new stage channel: "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER).join(`, `)}" or "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST).join(`, `)}"`);
+                    if (!LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => PermissionsUtils.hasPerm(permissions, perm)) && !LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
+                        return this.destroy(`Missing one of the following permissions in the new stage channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`);
                     }
                 } else {
                     this._isStage = false;
                     this._isSpeaker = null;
                 }
 
-                if (!PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.VOICE)) {
-                    return this.destroy(`Missing one of the following permissions in the new voice channel: "${PermissionsUtils.toReadable(LavalinkConstants.REQUIRED_PERMISSIONS.VOICE).join(`, `)}"`);
+                if (!LavalinkConstants.REQUIRED_PERMISSIONS.VOICE_MOVED.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
+                    return this.destroy(`Missing one of the following permissions in the new voice channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.VOICE_MOVED.join(`, `)}`);
                 }
             }
 
@@ -701,10 +702,11 @@ export class Player extends TypedEmitter<PlayerEvents> {
 
                     permissions ??= await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel).catch((error) => {
                         this.destroy(`Unable to get self permissions in the new voice channel: ${(error?.message ?? error) ?? `Unknown reason`}`);
+                        return -1n;
                     });
-                    if (typeof permissions !== `bigint`) return;
+                    if (permissions === -1n) return;
 
-                    if (PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER)) {
+                    if (LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             suppress: false
@@ -725,7 +727,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
                             });
                     }
 
-                    if (!this._isSpeaker && PermissionsUtils.hasPerm(permissions, LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
+                    if (!this._isSpeaker && LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             request_to_speak_timestamp: new Date().toISOString()
