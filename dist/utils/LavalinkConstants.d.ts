@@ -10,10 +10,11 @@ export declare const LavalinkConstants: {
      * Required permission flags for a {@link Player player} to perform certain actions.
      */
     readonly REQUIRED_PERMISSIONS: {
-        readonly TEXT: 19456n;
-        readonly VOICE: 3146752n;
-        readonly STAGE_BECOME_SPEAKER: 4194304n;
-        readonly STAGE_REQUEST: 4294967296n;
+        readonly TEXT: readonly ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS"];
+        readonly VOICE: readonly ["VIEW_CHANNEL", "CONNECT", "SPEAK"];
+        readonly VOICE_MOVED: readonly ["SPEAK"];
+        readonly STAGE_BECOME_SPEAKER: readonly ["MUTE_MEMBERS"];
+        readonly STAGE_REQUEST: readonly ["REQUEST_TO_SPEAK"];
     };
     /**
      * Source identifiers for searches.

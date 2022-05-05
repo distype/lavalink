@@ -13,10 +13,11 @@ exports.LavalinkConstants = {
      * Required permission flags for a {@link Player player} to perform certain actions.
      */
     REQUIRED_PERMISSIONS: {
-        TEXT: 19456n,
-        VOICE: 3146752n,
-        STAGE_BECOME_SPEAKER: 4194304n,
-        STAGE_REQUEST: 4294967296n
+        TEXT: [`VIEW_CHANNEL`, `SEND_MESSAGES`, `EMBED_LINKS`],
+        VOICE: [`VIEW_CHANNEL`, `CONNECT`, `SPEAK`],
+        VOICE_MOVED: [`SPEAK`],
+        STAGE_BECOME_SPEAKER: [`MUTE_MEMBERS`],
+        STAGE_REQUEST: [`REQUEST_TO_SPEAK`]
     },
     /**
      * Source identifiers for searches.
