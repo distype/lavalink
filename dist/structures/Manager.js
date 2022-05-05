@@ -4,7 +4,7 @@ exports.Manager = void 0;
 const Node_1 = require("./Node");
 const Player_1 = require("./Player");
 const Track_1 = require("./Track");
-const LavalinkConstants_1 = require("../utils/LavalinkConstants");
+const DistypeLavalinkError_1 = require("../errors/DistypeLavalinkError");
 const node_utils_1 = require("@br88c/node-utils");
 /**
  * The Lavalink manager.
@@ -105,7 +105,7 @@ class Manager extends node_utils_1.TypedEmitter {
             return existing;
         const node = this.availableNodes[0];
         if (!node)
-            throw new Error(`No available nodes to bind the player to`);
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`No available nodes to bind the player to`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
         const player = new Player_1.Player(this, node, guild, textChannel, voiceChannel, options, this._log, this._logThisArg);
         this.players.set(guild, player);
         player.on(`VOICE_CONNECTED`, (channel) => this.emit(`PLAYER_VOICE_CONNECTED`, player, channel));
@@ -131,10 +131,10 @@ class Manager extends node_utils_1.TypedEmitter {
     async search(query, requester, source) {
         const searchNode = this.availableNodes[0];
         if (!searchNode)
-            throw new Error(`No nodes are available to perform a search`);
-        const res = await searchNode.request(`GET`, `/loadtracks`, { query: { identifier: LavalinkConstants_1.LavalinkConstants.URL_REGEX.test(query) ? query : `${source ?? this.options.defaultSearchSource}search:${query}` } });
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`No nodes are available to perform a search`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
+        const res = await searchNode.request(`GET`, `/loadtracks`, { query: { identifier: /^https?:\/\//.test(query) ? query : `${source ?? this.options.defaultSearchSource}search:${query}` } });
         if (!res)
-            throw new Error(`No search response data`);
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`No search response data`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_RESPONSE_DATA, this.system);
         const searchResult = {
             loadType: res.loadType,
             tracks: res.tracks.map((data) => new Track_1.Track({
@@ -159,13 +159,13 @@ class Manager extends node_utils_1.TypedEmitter {
     async decodeTracks(...tracks) {
         const decodeNode = this.availableNodes[0];
         if (!decodeNode)
-            throw new Error(`No nodes are available to decode tracks`);
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`No nodes are available to decode tracks`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
         if (!tracks.length)
-            throw new Error(`You must provide at least 1 track to decode`);
+            throw new TypeError(`You must provide at least 1 track to decode`);
         else if (tracks.length === 1) {
             const res = await decodeNode.request(`GET`, `/decodetrack`, { query: { track: tracks[0] } });
             if (typeof res !== `object` || res === null)
-                throw new Error(`No decode response data`);
+                throw new DistypeLavalinkError_1.DistypeLavalinkError(`No decode response data`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_RESPONSE_DATA, this.system);
             return [
                 new Track_1.Track({
                     track: tracks[0],
@@ -176,7 +176,7 @@ class Manager extends node_utils_1.TypedEmitter {
         else {
             const res = await decodeNode.request(`POST`, `/decodetracks`, { body: tracks });
             if (!Array.isArray(res))
-                throw new Error(`No decode response data`);
+                throw new DistypeLavalinkError_1.DistypeLavalinkError(`No decode response data`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_RESPONSE_DATA, this.system);
             return res.map((data) => new Track_1.Track({
                 track: data.track,
                 ...data.info

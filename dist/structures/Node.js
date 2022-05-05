@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Node = exports.NodeState = void 0;
+const DistypeLavalinkError_1 = require("../errors/DistypeLavalinkError");
 const node_utils_1 = require("@br88c/node-utils");
 const undici_1 = require("undici");
 const ws_1 = require("ws");
@@ -90,7 +91,7 @@ class Node extends node_utils_1.TypedEmitter {
      */
     async spawn() {
         if (this._spinning)
-            throw new Error(`Node is already connecting`);
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Node is already connecting`, DistypeLavalinkError_1.DistypeLavalinkErrorType.NODE_ALREADY_CONNECTING, this.system);
         this._spinning = true;
         this._killed = false;
         for (let i = 0; i < this.options.spawnMaxAttempts; i++) {
@@ -113,7 +114,7 @@ class Node extends node_utils_1.TypedEmitter {
                 this._log(`Spawning interrupted by kill`, {
                     level: `DEBUG`, system: this.system
                 });
-                throw new Error(`Node spawn attempts interrupted by kill`);
+                throw new DistypeLavalinkError_1.DistypeLavalinkError(`Node spawn attempts interrupted by kill`, DistypeLavalinkError_1.DistypeLavalinkErrorType.NODE_INTERRUPT_FROM_KILL, this.system);
             }
             if (i < this.options.spawnMaxAttempts - 1) {
                 await (0, node_utils_1.wait)(this.options.spawnAttemptDelay);
@@ -121,7 +122,7 @@ class Node extends node_utils_1.TypedEmitter {
         }
         this._spinning = false;
         this._enterState(NodeState.IDLE);
-        throw new Error(`Failed to spawn node after ${this.options.spawnMaxAttempts} attempts`);
+        throw new DistypeLavalinkError_1.DistypeLavalinkError(`Failed to spawn node after ${this.options.spawnMaxAttempts} attempts`, DistypeLavalinkError_1.DistypeLavalinkErrorType.NODE_MAX_SPAWN_ATTEMPTS_REACHED, this.system);
     }
     /**
      * Kill the node.
@@ -144,7 +145,7 @@ class Node extends node_utils_1.TypedEmitter {
         const payload = JSON.stringify(data);
         return await new Promise((resolve, reject) => {
             if (!this._ws || this._ws.readyState !== ws_1.WebSocket.OPEN) {
-                reject(new Error(`Cannot send data when the socket is not in an OPEN state`));
+                reject(new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot send data when the socket is not in an OPEN state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.NODE_SEND_WITHOUT_OPEN_SOCKET, this.system));
             }
             else {
                 this._ws.send(payload, (error) => {
@@ -194,9 +195,9 @@ class Node extends node_utils_1.TypedEmitter {
             }) : undefined
         }));
         if (typeof unableToParse === `string`)
-            throw new Error(`Unable to parse response body: "${unableToParse}"`);
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Unable to parse response body: "${unableToParse}"`, DistypeLavalinkError_1.DistypeLavalinkErrorType.NODE_REST_UNABLE_TO_PARSE_RESPONSE_BODY, this.system);
         if (res.statusCode >= 400)
-            throw new Error(`REST status code ${res.statusCode}`);
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`REST status code ${res.statusCode}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.NODE_REST_REQUEST_ERROR, this.system);
         return res.body;
     }
     /**
@@ -237,7 +238,7 @@ class Node extends node_utils_1.TypedEmitter {
      */
     async _initSocket() {
         if (!this.manager.client.gateway.user)
-            throw new Error(`Gateway user is not defined`);
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Gateway user is not defined`, DistypeLavalinkError_1.DistypeLavalinkErrorType.DISTYPE_GATEWAY_USER_UNDEFINED, this.system);
         if (this.state !== NodeState.IDLE && this.state !== NodeState.DISCONNECTED) {
             this._close(1000, `Restarting`);
             this._enterState(NodeState.DISCONNECTED);
@@ -255,7 +256,7 @@ class Node extends node_utils_1.TypedEmitter {
             if (this.options.resumeKeyConfig?.key)
                 headers[`Resume-Key`] = this.options.resumeKeyConfig.key;
             this._ws = new ws_1.WebSocket(`ws${this.options.location.secure ? `s` : ``}://${this.options.location.host}:${this.options.location.port}/`, { headers });
-            this._ws.once(`close`, (code, reason) => reject(new Error(`Socket closed with code ${code}: "${this._parsePayload(reason)}"`)));
+            this._ws.once(`close`, (code, reason) => reject(new DistypeLavalinkError_1.DistypeLavalinkError(`Socket closed with code ${code}: "${this._parsePayload(reason)}"`, DistypeLavalinkError_1.DistypeLavalinkErrorType.NODE_CLOSED_DURING_SOCKET_INIT, this.system)));
             this._ws.once(`error`, (error) => reject(error));
             this._ws.once(`open`, () => {
                 this._log(`Socket open`, {

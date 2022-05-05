@@ -118,7 +118,7 @@ export declare enum NodeState {
     DISCONNECTED = 3
 }
 /**
- * Statistics about a node sent from the Lavalink server.
+ * Statistics about a {@link Node node} sent from the Lavalink server.
  */
 export interface NodeStats {
     /**
