@@ -72,7 +72,7 @@ var DistypeLavalinkErrorType;
     DistypeLavalinkErrorType["PLAYER_INVALID_SKIP_POSITION"] = "PLAYER_INVALID_SKIP_POSITION";
     /**
      * The {@link Player player} is missing permissions to perform an action.
-     * Should be emitted by a {@link Player player}.
+     * Should be emitted by a {@link Player player}, or `Manager#preparePlayer()`.
      */
     DistypeLavalinkErrorType["PLAYER_MISSING_PERMISSIONS"] = "PLAYER_MISSING_PERMISSIONS";
     /**

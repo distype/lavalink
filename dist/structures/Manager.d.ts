@@ -181,15 +181,16 @@ export declare class Manager extends TypedEmitter<ManagerEvents> {
      */
     spawnNodes(): Promise<void>;
     /**
-     * Create a new player.
-     * If a player for the specified guild already exists, it is returned and no new player is created.
+     * Creates a new player and connects it to the voice channel. Also checks channel permissions.
+     * The player is not saved or bound to the manager if it fails to connect or doesn't have sufficient permissions.
+     * If a player for the specified guild already exists, it is returned and no new player is created. If it is disconnected, it is automatically connected.
      * @param guild The player's guild.
      * @param textChannel The player's text channel.
      * @param voiceChannel The player's voice channel.
      * @param options The player's options.
      * @returns The created player.
      */
-    createPlayer(guild: Snowflake, textChannel: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Player;
+    preparePlayer(guild: Snowflake, textChannel: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Promise<Player>;
     /**
      * Get search results based on a query.
      * If the query is a link, it will attempt to get a track from the link. If not, it will return results from a search using the specified or default source.
