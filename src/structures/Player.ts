@@ -306,12 +306,12 @@ export class Player extends TypedEmitter<PlayerEvents> {
 
         const permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
         if (!LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
-            throw new DistypeLavalinkError(`Missing one of the following permissions to join the voice channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+            throw new DistypeLavalinkError(`Missing one of the following permissions in the voice channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
 
         const voiceChannel = await this.manager.client.getChannelData(this.voiceChannel, `type`);
         if (voiceChannel.type === ChannelType.GuildStageVoice && !LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => PermissionsUtils.hasPerm(permissions, perm)) && !LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
-            throw new DistypeLavalinkError(`Missing one of the following permissions to join the stage channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+            throw new DistypeLavalinkError(`Missing one of the following permissions in the stage channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
 
         this._spinning = true;
