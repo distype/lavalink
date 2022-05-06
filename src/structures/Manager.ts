@@ -1,5 +1,5 @@
 import { Node, NodeOptions, NodeState } from './Node';
-import { Player, PlayerOptions } from './Player';
+import { Player, PlayerOptions, PlayerState } from './Player';
 import { Track } from './Track';
 
 import { DistypeLavalinkError, DistypeLavalinkErrorType } from '../errors/DistypeLavalinkError';
@@ -7,7 +7,7 @@ import { LogCallback } from '../types/Log';
 import { LavalinkConstants } from '../utils/LavalinkConstants';
 
 import { ExtendedMap, TypedEmitter } from '@br88c/node-utils';
-import { Client, Snowflake } from 'distype';
+import { Client, PermissionsUtils, Snowflake } from 'distype';
 import { GatewayVoiceServerUpdateDispatch, GatewayVoiceStateUpdateDispatch } from 'discord-api-types/v10';
 
 /**
@@ -257,22 +257,38 @@ export class Manager extends TypedEmitter<ManagerEvents> {
     }
 
     /**
-     * Create a new player.
-     * If a player for the specified guild already exists, it is returned and no new player is created.
+     * Creates a new player and connects it to the voice channel. Also checks channel permissions.
+     * The player is not saved or bound to the manager if it fails to connect or doesn't have sufficient permissions.
+     * If a player for the specified guild already exists, it is returned and no new player is created. If it is disconnected, it is automatically connected.
      * @param guild The player's guild.
      * @param textChannel The player's text channel.
      * @param voiceChannel The player's voice channel.
      * @param options The player's options.
      * @returns The created player.
      */
-    public createPlayer (guild: Snowflake, textChannel: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Player {
+    public async preparePlayer (guild: Snowflake, textChannel: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Promise<Player> {
         const existing = this.players.get(guild);
-        if (existing) return existing;
+        if (existing) {
+            await existing.connect().finally(() => {
+                if (player.state === PlayerState.DISCONNECTED) player.destroy();
+            });
+
+            return existing;
+        }
 
         const node = this.availableNodes[0];
         if (!node) throw new DistypeLavalinkError(`No available nodes to bind the player to`, DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
 
+        const permissions = await this.client.getSelfPermissions(guild, textChannel);
+        if (!LavalinkConstants.REQUIRED_PERMISSIONS.TEXT.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
+            throw new DistypeLavalinkError(`Missing one of the following permissions in the text channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.TEXT.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, `Lavalink Player ${guild}`);
+        }
+
         const player = new Player(this, node, guild, textChannel, voiceChannel, options, this._log, this._logThisArg);
+        await player.connect().finally(() => {
+            if (player.state === PlayerState.DISCONNECTED) player.destroy();
+        });
+
         this.players.set(guild, player);
 
         player.on(`VOICE_CONNECTED`, (channel) => this.emit(`PLAYER_VOICE_CONNECTED`, player, channel));
