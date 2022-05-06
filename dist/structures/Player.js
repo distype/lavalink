@@ -121,11 +121,11 @@ class Player extends node_utils_1.TypedEmitter {
             return;
         const permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
         if (!LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Missing one of the following permissions to join the voice channel: ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.join(`, `)}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Missing one of the following permissions in the voice channel: ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.join(`, `)}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
         const voiceChannel = await this.manager.client.getChannelData(this.voiceChannel, `type`);
         if (voiceChannel.type === v10_1.ChannelType.GuildStageVoice && !LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm)) && !LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Missing one of the following permissions to join the stage channel: ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Missing one of the following permissions in the stage channel: ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
         this._spinning = true;
         this._log(`Connecting to voice channel ${this.voiceChannel}`, {
