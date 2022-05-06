@@ -104,7 +104,7 @@ class Node extends node_utils_1.TypedEmitter {
             if (attempt) {
                 this._spinning = false;
                 this._log(`Spawned after ${i + 1} attempts`, {
-                    level: `DEBUG`, system: this.system
+                    level: i === 0 ? `DEBUG` : `WARN`, system: this.system
                 });
                 return;
             }
