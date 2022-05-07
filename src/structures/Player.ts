@@ -760,12 +760,12 @@ export class Player extends TypedEmitter<PlayerEvents> {
         if (payload.op === `playerUpdate`) {
             this.trackPosition = payload.state.position ?? null;
         } else if (payload.op === `event`) {
-            const track: Track | undefined = (typeof payload.track === `string` ? (await this.manager.decodeTracks(payload.track).catch((error) => {
+            const track: Track | undefined = typeof payload.track === `string` ? (await this.manager.decodeTracks(payload.track).catch((error) => {
                 this._log(`Unable to decode track from payload: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                     level: `WARN`, system: this.system
                 });
                 return [];
-            })) : [])[0];
+            }))[0] : undefined;
 
             if (track) track.requester = this.currentTrack && this.currentTrack.track === track.track ? this.currentTrack.requester : this.queue.find((v) => v.track === track.track)?.requester;
 
@@ -774,7 +774,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
                     this.trackPosition = null;
                     this.state = PlayerState.CONNECTED;
 
-                    this._log(`TRACK_END: ${payload.reason} (${track.identifier})`, {
+                    this._log(`TRACK_END: ${payload.reason} (${track?.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
                     this.emit(`TRACK_END`, payload.reason, track);
@@ -791,7 +791,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
                 }
 
                 case `TrackExceptionEvent`: {
-                    this._log(`TRACK_EXCEPTION: ${payload.exception.message} (Severity ${payload.exception.severity}, track ${track.identifier}), caused by "${payload.exception.cause}"`, {
+                    this._log(`TRACK_EXCEPTION: ${payload.exception.message} (Severity ${payload.exception.severity}, track ${track?.identifier}), caused by "${payload.exception.cause}"`, {
                         level: `DEBUG`, system: this.system
                     });
                     this.emit(`TRACK_EXCEPTION`, payload.exception.message, payload.exception.severity, payload.exception.cause, track);
@@ -800,7 +800,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
                 }
 
                 case `TrackStartEvent`: {
-                    this._log(`TRACK_START (${track.identifier})`, {
+                    this._log(`TRACK_START (${track?.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
                     this.emit(`TRACK_START`, track);
@@ -819,7 +819,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
                 }
 
                 case `TrackStuckEvent`: {
-                    this._log(`TRACK_STUCK: Threshold ${payload.thresholdMs}ms (${track.identifier})`, {
+                    this._log(`TRACK_STUCK: Threshold ${payload.thresholdMs}ms (${track?.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
                     this.emit(`TRACK_STUCK`, payload.thresholdMs, track);
