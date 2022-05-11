@@ -6,7 +6,7 @@ import { DistypeLavalinkError, DistypeLavalinkErrorType } from '../errors/Distyp
 import { LogCallback } from '../types/Log';
 import { LavalinkConstants } from '../utils/LavalinkConstants';
 
-import { TypedEmitter } from '@br88c/node-utils';
+import { shuffleArray, TypedEmitter } from '@br88c/node-utils';
 import { ChannelType, GatewayVoiceStateUpdateDispatchData } from 'discord-api-types/v10';
 import { VoiceCloseCodes } from 'discord-api-types/voice/v4';
 import { PermissionsUtils, Snowflake } from 'distype';
@@ -480,10 +480,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
 
         await this._stop();
 
-        for (let i = this.queue.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this.queue[i], this.queue[j]] = [this.queue[j], this.queue[i]];
-        }
+        this.queue = shuffleArray(this.queue);
 
         this.queuePosition = 0;
         await this._play(this.queue[0]);
