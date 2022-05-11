@@ -276,10 +276,7 @@ class Player extends node_utils_1.TypedEmitter {
         if (this.state < PlayerState.CONNECTED)
             throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot shuffle when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
         await this._stop();
-        for (let i = this.queue.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this.queue[i], this.queue[j]] = [this.queue[j], this.queue[i]];
-        }
+        this.queue = (0, node_utils_1.shuffleArray)(this.queue);
         this.queuePosition = 0;
         await this._play(this.queue[0]);
         this._log(`Shuffled`, {
