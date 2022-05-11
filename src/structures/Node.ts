@@ -5,6 +5,7 @@ import { LogCallback } from '../types/Log';
 
 import { TypedEmitter, wait } from '@br88c/node-utils';
 import { RestMethod, RestRoute } from 'distype';
+import { randomUUID } from 'node:crypto';
 import { request } from 'undici';
 import { RawData, WebSocket } from 'ws';
 
@@ -397,6 +398,34 @@ export class Node extends TypedEmitter<NodeEvents> {
     }
 
     /**
+     * Get the node's socket ping.
+     * @returns The node's ping in milliseconds.
+     */
+    public async getPing (): Promise<number> {
+        return await new Promise((resolve, reject) => {
+            if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+                reject(new DistypeLavalinkError(`Cannot send data when the socket is not in an OPEN state`, DistypeLavalinkErrorType.NODE_SEND_WITHOUT_OPEN_SOCKET, this.system));
+            } else {
+                const uuid = randomUUID();
+                const start = Date.now();
+
+                const onPong = (data: Buffer): void => {
+                    const time = Date.now() - start;
+                    if (this._parsePayload(data) === uuid) {
+                        this._ws?.removeListener(`pong`, onPong);
+                        resolve(time);
+                    }
+                };
+
+                this._ws.ping(uuid, undefined, (error) => {
+                    if (error) reject(error);
+                    else this._ws?.on(`pong`, onPong);
+                });
+            }
+        });
+    }
+
+    /**
      * Closes the connection, and cleans up helper variables.
      * @param code A socket [close code](https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code).
      * @param reason The reason the node is being closed.
@@ -506,12 +535,19 @@ export class Node extends TypedEmitter<NodeEvents> {
      * @returns The parsed data.
      */
     private _parsePayload (data: RawData): any {
+        if (typeof data !== `object` && typeof data !== `function`) return data;
+
         try {
             if (Array.isArray(data)) data = Buffer.concat(data);
             else if (data instanceof ArrayBuffer) data = Buffer.from(data);
-            return JSON.parse(data.toString());
+
+            try {
+                return JSON.parse(data.toString());
+            } catch {
+                if (typeof data.toString === `function`) return data.toString();
+                else return data;
+            }
         } catch (error: any) {
-            if (typeof data === `string` || (typeof data.toString === `function` && typeof data.toString() === `string`)) return data;
             this._log(`Payload parsing error: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                 level: `WARN`, system: this.system
             });
