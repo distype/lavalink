@@ -115,7 +115,7 @@ class Manager extends node_utils_1.TypedEmitter {
         if (!node)
             throw new DistypeLavalinkError_1.DistypeLavalinkError(`No available nodes to bind the player to`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
         const permissions = await this.client.getSelfPermissions(guild, textChannel);
-        if (!LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.TEXT.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
+        if (!distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.TEXT)) {
             throw new DistypeLavalinkError_1.DistypeLavalinkError(`Missing one of the following permissions in the text channel: ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.TEXT.join(`, `)}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, `Lavalink Player ${guild}`);
         }
         const player = new Player_1.Player(this, node, guild, textChannel, voiceChannel, options, this._log, this._logThisArg);

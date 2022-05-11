@@ -120,11 +120,11 @@ class Player extends node_utils_1.TypedEmitter {
         if (this.state >= PlayerState.CONNECTED)
             return;
         const permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
-        if (!LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
+        if (!distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE)) {
             throw new DistypeLavalinkError_1.DistypeLavalinkError(`Missing one of the following permissions in the voice channel: ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.join(`, `)}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
         const voiceChannel = await this.manager.client.getChannelData(this.voiceChannel, `type`);
-        if (voiceChannel.type === v10_1.ChannelType.GuildStageVoice && !LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm)) && !LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
+        if (voiceChannel.type === v10_1.ChannelType.GuildStageVoice && !distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
             throw new DistypeLavalinkError_1.DistypeLavalinkError(`Missing one of the following permissions in the stage channel: ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
         this._spinning = true;
@@ -139,7 +139,7 @@ class Player extends node_utils_1.TypedEmitter {
                 });
                 if (voiceChannel.type === v10_1.ChannelType.GuildStageVoice) {
                     this._isStage = true;
-                    if (LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
+                    if (distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER)) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             suppress: false
@@ -455,7 +455,7 @@ class Player extends node_utils_1.TypedEmitter {
                 if (channel.type === v10_1.ChannelType.GuildStageVoice) {
                     this._isStage = true;
                     this._isSpeaker = data.suppress;
-                    if (!LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm)) && !LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
+                    if (!distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
                         return this.destroy(`Missing one of the following permissions in the new stage channel: ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`);
                     }
                 }
@@ -463,7 +463,7 @@ class Player extends node_utils_1.TypedEmitter {
                     this._isStage = false;
                     this._isSpeaker = null;
                 }
-                if (!LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE_MOVED.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
+                if (!distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE_MOVED)) {
                     return this.destroy(`Missing one of the following permissions in the new voice channel: ${LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE_MOVED.join(`, `)}`);
                 }
             }
@@ -482,7 +482,7 @@ class Player extends node_utils_1.TypedEmitter {
                     });
                     if (permissions === -1n)
                         return;
-                    if (LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
+                    if (distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER)) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             suppress: false
@@ -502,7 +502,7 @@ class Player extends node_utils_1.TypedEmitter {
                             });
                         });
                     }
-                    if (!this._isSpeaker && LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.every((perm) => distype_1.PermissionsUtils.hasPerm(permissions, perm))) {
+                    if (!this._isSpeaker && distype_1.PermissionsUtils.hasPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
                         await this.manager.client.rest.modifyCurrentUserVoiceState(this.guild, {
                             channel_id: this.voiceChannel,
                             request_to_speak_timestamp: new Date().toISOString()
