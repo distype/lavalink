@@ -280,7 +280,7 @@ export class Manager extends TypedEmitter<ManagerEvents> {
         if (!node) throw new DistypeLavalinkError(`No available nodes to bind the player to`, DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
 
         const permissions = await this.client.getSelfPermissions(guild, textChannel);
-        if (!LavalinkConstants.REQUIRED_PERMISSIONS.TEXT.every((perm) => PermissionsUtils.hasPerm(permissions, perm))) {
+        if (!PermissionsUtils.hasPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.TEXT)) {
             throw new DistypeLavalinkError(`Missing one of the following permissions in the text channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.TEXT.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, `Lavalink Player ${guild}`);
         }
 
