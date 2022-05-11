@@ -237,6 +237,11 @@ export declare class Node extends TypedEmitter<NodeEvents> {
      */
     request(method: RestMethod, route: RestRoute, options?: NodeRequestOptions): Promise<any>;
     /**
+     * Get the node's socket ping.
+     * @returns The node's ping in milliseconds.
+     */
+    getPing(): Promise<number>;
+    /**
      * Closes the connection, and cleans up helper variables.
      * @param code A socket [close code](https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code).
      * @param reason The reason the node is being closed.
