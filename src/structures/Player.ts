@@ -453,10 +453,9 @@ export class Player extends TypedEmitter<PlayerEvents> {
     public async skip (index?: number): Promise<void> {
         if (this.state < PlayerState.CONNECTED) throw new DistypeLavalinkError(`Cannot skip when the player isn't in a connected, paused, or playing state`, DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
 
-        await this._stop();
-
         if (typeof index === `number`) {
             if (index < 0 || index >= this.queue.length) throw new DistypeLavalinkError(`Invalid index`, DistypeLavalinkErrorType.PLAYER_INVALID_SKIP_POSITION, this.system);
+
             await this._play(this.queue[index]);
             this.queuePosition = index;
 
@@ -610,7 +609,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
 
         await this.node.send({
             op: `volume`,
-            guildId: this.volume,
+            guildId: this.guild,
             volume
         });
 
