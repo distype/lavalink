@@ -601,11 +601,11 @@ class Player extends node_utils_1.TypedEmitter {
                 }
                 case `WebSocketClosedEvent`: {
                     if (payload.code !== v4_1.VoiceCloseCodes.Disconnected) {
-                        this._log(`WEBSOCKET_CLOSED: Code ${payload.code}, "${payload.reason}"${payload.byRemove ? `, by remote` : ``}`, {
+                        this._log(`WEBSOCKET_CLOSED: Code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `, "${payload.reason}"` : ``}${payload.byRemove ? `, by remote` : ``}`, {
                             level: `DEBUG`, system: this.system
                         });
                         this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
-                        this.destroy(`Disconnected with code ${payload.code}: "${payload.reason}"`);
+                        this.destroy(`Disconnected with code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `: "${payload.reason}"` : ``}`);
                     }
                     break;
                 }
