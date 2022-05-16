@@ -93,6 +93,17 @@ class Manager extends node_utils_1.TypedEmitter {
         this.emit(`NODES_READY`, success, failed);
     }
     /**
+     * Gets the average ping across all nodes.
+     * @returns The average ping in milliseconds.
+     */
+    async averagePing() {
+        let totalPing = 0;
+        for (const node of this.nodes.values()) {
+            totalPing += await node.getPing();
+        }
+        return totalPing / this.nodes.size;
+    }
+    /**
      * Creates a new player and connects it to the voice channel. Also checks channel permissions.
      * The player is not permanently saved or bound to the manager if it fails to connect or doesn't have sufficient permissions.
      * If a player for the specified guild already exists, it is returned and no new player is created. If it is disconnected, it is automatically connected.
