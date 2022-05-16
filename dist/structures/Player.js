@@ -252,7 +252,6 @@ class Player extends node_utils_1.TypedEmitter {
     async skip(index) {
         if (this.state < PlayerState.CONNECTED)
             throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot skip when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
-        await this._stop();
         if (typeof index === `number`) {
             if (index < 0 || index >= this.queue.length)
                 throw new DistypeLavalinkError_1.DistypeLavalinkError(`Invalid index`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_INVALID_SKIP_POSITION, this.system);
@@ -392,7 +391,7 @@ class Player extends node_utils_1.TypedEmitter {
             throw new DistypeLavalinkError_1.DistypeLavalinkError(`Volume must be between ${LavalinkConstants_1.LavalinkConstants.VOLUME.MIN} and ${LavalinkConstants_1.LavalinkConstants.VOLUME.MAX}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_VOLUME_OUT_OF_RANGE, this.system);
         await this.node.send({
             op: `volume`,
-            guildId: this.volume,
+            guildId: this.guild,
             volume
         });
         this.volume = volume;
