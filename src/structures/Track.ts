@@ -13,6 +13,10 @@ export interface TrackData {
      */
     readonly identifier: string
     /**
+     * If the track is seekable.
+     */
+    readonly isSeekable: boolean
+    /**
      * The track's author.
      */
     readonly author: string
@@ -61,6 +65,10 @@ export class Track implements TrackData {
      */
     public readonly identifier: string;
     /**
+     * If the track is seekable.
+     */
+    readonly isSeekable: boolean;
+    /**
      * The track's author.
      */
     public readonly author: string;
@@ -97,6 +105,7 @@ export class Track implements TrackData {
     constructor (data: TrackData, requester?: string) {
         this.track = data.track;
         this.identifier = data.identifier;
+        this.isSeekable = data.isSeekable;
         this.author = data.author;
         this.length = data.length;
         this.isStream = data.isStream;
