@@ -13,6 +13,7 @@ class Track {
     constructor(data, requester) {
         this.track = data.track;
         this.identifier = data.identifier;
+        this.isSeekable = data.isSeekable;
         this.author = data.author;
         this.length = data.length;
         this.isStream = data.isStream;

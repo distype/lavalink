@@ -13,6 +13,10 @@ export interface TrackData {
      */
     readonly identifier: string;
     /**
+     * If the track is seekable.
+     */
+    readonly isSeekable: boolean;
+    /**
      * The track's author.
      */
     readonly author: string;
@@ -58,6 +62,10 @@ export declare class Track implements TrackData {
      * The track's identifier.
      */
     readonly identifier: string;
+    /**
+     * If the track is seekable.
+     */
+    readonly isSeekable: boolean;
     /**
      * The track's author.
      */
