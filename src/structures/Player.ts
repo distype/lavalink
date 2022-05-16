@@ -837,12 +837,12 @@ export class Player extends TypedEmitter<PlayerEvents> {
 
                 case `WebSocketClosedEvent`: {
                     if (payload.code !== VoiceCloseCodes.Disconnected) {
-                        this._log(`WEBSOCKET_CLOSED: Code ${payload.code}, "${payload.reason}"${payload.byRemove ? `, by remote` : ``}`, {
+                        this._log(`WEBSOCKET_CLOSED: Code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `, "${payload.reason}"` : ``}${payload.byRemove ? `, by remote` : ``}`, {
                             level: `DEBUG`, system: this.system
                         });
                         this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
 
-                        this.destroy(`Disconnected with code ${payload.code}: "${payload.reason}"`);
+                        this.destroy(`Disconnected with code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `: "${payload.reason}"` : ``}`);
                     }
 
                     break;
