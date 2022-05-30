@@ -5,7 +5,6 @@ const DistypeLavalinkError_1 = require("../errors/DistypeLavalinkError");
 const LavalinkConstants_1 = require("../utils/LavalinkConstants");
 const node_utils_1 = require("@br88c/node-utils");
 const v10_1 = require("discord-api-types/v10");
-const v4_1 = require("discord-api-types/voice/v4");
 const distype_1 = require("distype");
 /**
  * A {@link Player player}'s state.
@@ -600,13 +599,10 @@ class Player extends node_utils_1.TypedEmitter {
                     break;
                 }
                 case `WebSocketClosedEvent`: {
-                    if (payload.code !== v4_1.VoiceCloseCodes.Disconnected) {
-                        this._log(`WEBSOCKET_CLOSED: Code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `, "${payload.reason}"` : ``}${payload.byRemove ? `, by remote` : ``}`, {
-                            level: `DEBUG`, system: this.system
-                        });
-                        this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
-                        this.destroy(`Disconnected with code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `: "${payload.reason}"` : ``}`);
-                    }
+                    this._log(`WEBSOCKET_CLOSED: Code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `, "${payload.reason}"` : ``}${payload.byRemove ? `, by remote` : ``}`, {
+                        level: `WARN`, system: this.system
+                    });
+                    this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
                     break;
                 }
             }

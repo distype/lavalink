@@ -46,7 +46,7 @@ export declare type PlayerEvents = {
      */
     TRACK_STUCK: (thresholdMs: number, track?: Track) => void;
     /**
-     * When the {@link Player player}'s {@link Node node} receives a voice websocket close. Note that `4014` close codes are not emitted.
+     * When the {@link Player player}'s {@link Node node} receives a voice websocket close.
      */
     WEBSOCKET_CLOSED: (code: number, reason: string, byRemote: boolean) => void;
 };

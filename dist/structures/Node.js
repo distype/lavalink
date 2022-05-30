@@ -4,6 +4,7 @@ exports.Node = exports.NodeState = void 0;
 const DistypeLavalinkError_1 = require("../errors/DistypeLavalinkError");
 const node_utils_1 = require("@br88c/node-utils");
 const node_crypto_1 = require("node:crypto");
+const promises_1 = require("node:timers/promises");
 const undici_1 = require("undici");
 const ws_1 = require("ws");
 /**
@@ -118,7 +119,7 @@ class Node extends node_utils_1.TypedEmitter {
                 throw new DistypeLavalinkError_1.DistypeLavalinkError(`Node spawn attempts interrupted by kill`, DistypeLavalinkError_1.DistypeLavalinkErrorType.NODE_INTERRUPT_FROM_KILL, this.system);
             }
             if (i < this.options.spawnMaxAttempts - 1) {
-                await (0, node_utils_1.wait)(this.options.spawnAttemptDelay);
+                await (0, promises_1.setTimeout)(this.options.spawnAttemptDelay);
             }
         }
         this._spinning = false;
@@ -172,21 +173,18 @@ class Node extends node_utils_1.TypedEmitter {
      */
     async request(method, route, options = {}) {
         const headers = {
-            ...this.options.defaultRequestOptions.headers,
-            ...options.headers,
-            'Authorization': this.options.password
+            'Authorization': this.options.password,
+            'Content-Type': `application/json`,
+            ...this._convertUndiciHeaders(this.options.defaultRequestOptions.headers),
+            ...this._convertUndiciHeaders(options.headers)
         };
-        if (options.body)
-            headers[`Content-Type`] = `application/json`;
-        const url = new URL(`http${this.options.location.secure ? `s` : ``}://${this.options.location.host}:${this.options.location.port}${route}`);
-        url.search = new URLSearchParams(options.query).toString();
-        const req = (0, undici_1.request)(url, {
+        const req = (0, undici_1.request)(`http${this.options.location.secure ? `s` : ``}://${this.options.location.host}:${this.options.location.port}${route}`, {
             ...this.options.defaultRequestOptions,
             ...options,
             method,
             headers,
             body: JSON.stringify(options.body),
-            bodyTimeout: options.timeout ?? this.options.defaultRequestOptions.timeout
+            query: options.query
         });
         let unableToParse = false;
         const res = await req.then(async (r) => ({
@@ -404,6 +402,14 @@ class Node extends node_utils_1.TypedEmitter {
                 break;
             }
         }
+    }
+    /**
+     * Converts specified headers with undici typings to a `Record<string, string>`.
+     * @param headers The headers to convert.
+     * @returns The formatted headers.
+     */
+    _convertUndiciHeaders(headers) {
+        return Array.isArray(headers) ? Object.fromEntries((0, node_utils_1.to2dArray)(headers, 2)) : headers;
     }
 }
 exports.Node = Node;
