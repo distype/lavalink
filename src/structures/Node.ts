@@ -3,9 +3,10 @@ import { Manager } from './Manager';
 import { DistypeLavalinkError, DistypeLavalinkErrorType } from '../errors/DistypeLavalinkError';
 import { LogCallback } from '../types/Log';
 
-import { TypedEmitter, wait } from '@br88c/node-utils';
+import { to2dArray, TypedEmitter } from '@br88c/node-utils';
 import { RestMethod, RestRoute } from 'distype';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as wait } from 'node:timers/promises';
 import { request } from 'undici';
 import { RawData, WebSocket } from 'ws';
 
@@ -101,20 +102,20 @@ export interface NodeOptions {
  * Extends undici request options.
  * @see [Undici Documentation](https://undici.nodejs.org/#/?id=undicirequesturl-options-promise)
  */
-export interface NodeRequestOptions extends Omit<NonNullable<Parameters<typeof request>[1]>, `body` | `bodyTimeout` | `method`> {
+export interface NodeRequestOptions extends Omit<NonNullable<Parameters<typeof request>[1]>, `body` | `method` | `query`> {
     /**
      * The request body.
      */
     body?: Record<string, any>
+    /**
+     * Request headers.
+     * Overwrite hierarchy; default headers overwritten by manager, manager headers overwritten by request options.
+     */
+    headers?: string[] | Record<string, string> | null
      /**
       * The request query.
       */
     query?: Record<string, any>
-    /**
-     * The amount of time in milliseconds to wait before considering a request timed out.
-     * Defaults to [undici's](https://undici.nodejs.org) `bodyTimeout` from [DispatchOptions](https://undici.nodejs.org/#/docs/api/Dispatcher?id=parameter-dispatchoptions).
-     */
-    timeout?: number
 }
 
 /**
@@ -364,22 +365,19 @@ export class Node extends TypedEmitter<NodeEvents> {
      */
     public async request (method: RestMethod, route: RestRoute, options: NodeRequestOptions = {}): Promise<any> {
         const headers: Record<string, any> = {
-            ...this.options.defaultRequestOptions.headers,
-            ...options.headers,
-            'Authorization': this.options.password
+            'Authorization': this.options.password,
+            'Content-Type': `application/json`,
+            ...this._convertUndiciHeaders(this.options.defaultRequestOptions.headers),
+            ...this._convertUndiciHeaders(options.headers)
         };
-        if (options.body) headers[`Content-Type`] = `application/json`;
 
-        const url = new URL(`http${this.options.location.secure ? `s` : ``}://${this.options.location.host}:${this.options.location.port}${route}`);
-        url.search = new URLSearchParams(options.query).toString();
-
-        const req = request(url, {
+        const req = request(`http${this.options.location.secure ? `s` : ``}://${this.options.location.host}:${this.options.location.port}${route}`, {
             ...this.options.defaultRequestOptions,
             ...options,
             method,
             headers,
             body: JSON.stringify(options.body),
-            bodyTimeout: options.timeout ?? this.options.defaultRequestOptions.timeout
+            query: options.query
         });
 
         let unableToParse: string | boolean = false;
@@ -614,5 +612,14 @@ export class Node extends TypedEmitter<NodeEvents> {
                 break;
             }
         }
+    }
+
+    /**
+     * Converts specified headers with undici typings to a `Record<string, string>`.
+     * @param headers The headers to convert.
+     * @returns The formatted headers.
+     */
+    private _convertUndiciHeaders (headers: NodeRequestOptions[`headers`]): Record<string, string> {
+        return Array.isArray(headers) ? Object.fromEntries(to2dArray(headers, 2)) : headers;
     }
 }
