@@ -8,7 +8,6 @@ import { LavalinkConstants } from '../utils/LavalinkConstants';
 
 import { shuffleArray, TypedEmitter } from '@br88c/node-utils';
 import { ChannelType, GatewayVoiceStateUpdateDispatchData } from 'discord-api-types/v10';
-import { VoiceCloseCodes } from 'discord-api-types/voice/v4';
 import { PermissionsUtils, Snowflake } from 'distype';
 
 /**
@@ -52,7 +51,7 @@ export type PlayerEvents = {
      */
     TRACK_STUCK: (thresholdMs: number, track?: Track) => void
     /**
-     * When the {@link Player player}'s {@link Node node} receives a voice websocket close. Note that `4014` close codes are not emitted.
+     * When the {@link Player player}'s {@link Node node} receives a voice websocket close.
      */
     WEBSOCKET_CLOSED: (code: number, reason: string, byRemote: boolean) => void
 }
@@ -836,12 +835,10 @@ export class Player extends TypedEmitter<PlayerEvents> {
                 }
 
                 case `WebSocketClosedEvent`: {
-                    if (payload.code !== VoiceCloseCodes.Disconnected) {
-                        this._log(`WEBSOCKET_CLOSED: Code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `, "${payload.reason}"` : ``}${payload.byRemove ? `, by remote` : ``}`, {
-                            level: `WARN`, system: this.system
-                        });
-                        this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
-                    }
+                    this._log(`WEBSOCKET_CLOSED: Code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `, "${payload.reason}"` : ``}${payload.byRemove ? `, by remote` : ``}`, {
+                        level: `WARN`, system: this.system
+                    });
+                    this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
 
                     break;
                 }
