@@ -374,7 +374,7 @@ export class Player extends TypedEmitter<PlayerEvents> {
                 this.removeListener(`DESTROYED`, onDestroy);
                 this._spinning = false;
                 reject(new DistypeLavalinkError(`Timed out while connecting to the voice channel`, DistypeLavalinkErrorType.PLAYER_VOICE_CONNECTION_FAILED, this.system));
-            }, this.options.connectionTimeout);
+            }, this.options.connectionTimeout).unref();
 
             this.once(`VOICE_CONNECTED`, onConnected);
             this.once(`DESTROYED`, onDestroy);
