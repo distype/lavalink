@@ -271,33 +271,22 @@ export class Manager extends TypedEmitter<ManagerEvents> {
     }
 
     /**
-     * Creates a new player and connects it to the voice channel. Also checks channel permissions.
-     * The player is not permanently saved or bound to the manager if it fails to connect or doesn't have sufficient permissions.
-     * If a player for the specified guild already exists, it is returned and no new player is created. If it is disconnected, it is automatically connected.
+     * Creates a new player. This method DOES NOT connect it to a voice channel (use `preparePlayer()` instead).
+     * If a player for the specified guild already exists, it is returned and no new player is created.
      * @param guild The player's guild.
      * @param voiceChannel The player's voice channel.
      * @param options The player's options.
      * @returns The created player.
      */
-    public async preparePlayer (guild: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Promise<Player> {
+    public createPlayer (guild: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Player {
         const existing = this.players.get(guild);
-        if (existing) {
-            await existing.connect().finally(() => {
-                if (player.state === PlayerState.DISCONNECTED) player.destroy();
-            });
-
-            return existing;
-        }
+        if (existing) return existing;
 
         const node = this.availableNodes[0];
         if (!node) throw new DistypeLavalinkError(`No available nodes to bind the player to`, DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
 
         const player = new Player(this, node, guild, voiceChannel, options, this._log, this._logThisArg);
         this.players.set(guild, player);
-
-        await player.connect().finally(() => {
-            if (player.state === PlayerState.DISCONNECTED) player.destroy();
-        });
 
         player.on(`VOICE_CONNECTED`, (channel) => this.emit(`PLAYER_VOICE_CONNECTED`, player, channel));
         player.on(`VOICE_MOVED`, (newChannel) => this.emit(`PLAYER_VOICE_MOVED`, player, newChannel));
@@ -309,6 +298,25 @@ export class Manager extends TypedEmitter<ManagerEvents> {
         player.on(`TRACK_START`, (track) => this.emit(`PLAYER_TRACK_START`, player, track));
         player.on(`TRACK_STUCK`, (thresholdMs, track) => this.emit(`PLAYER_TRACK_STUCK`, player, thresholdMs, track));
         player.on(`WEBSOCKET_CLOSED`, (code, reason, byRemote) => this.emit(`PLAYER_WEBSOCKET_CLOSED`, player, code, reason, byRemote));
+
+        return player;
+    }
+
+    /**
+     * Creates a new player and connects it to the voice channel. Also checks channel permissions.
+     * The player is not permanently saved or bound to the manager if it fails to connect or doesn't have sufficient permissions.
+     * If a player for the specified guild already exists, it is returned and no new player is created. If it is disconnected, it is automatically connected.
+     * @param guild The player's guild.
+     * @param voiceChannel The player's voice channel.
+     * @param options The player's options.
+     * @returns The created player.
+     */
+    public async preparePlayer (guild: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Promise<Player> {
+        const player = this.createPlayer(guild, voiceChannel, options);
+
+        await player.connect().finally(() => {
+            if (player.state === PlayerState.DISCONNECTED) player.destroy();
+        });
 
         return player;
     }
