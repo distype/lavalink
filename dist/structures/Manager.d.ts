@@ -186,6 +186,15 @@ export declare class Manager extends TypedEmitter<ManagerEvents> {
      */
     averagePing(): Promise<number>;
     /**
+     * Creates a new player. This method DOES NOT connect it to a voice channel (use `preparePlayer()` instead).
+     * If a player for the specified guild already exists, it is returned and no new player is created.
+     * @param guild The player's guild.
+     * @param voiceChannel The player's voice channel.
+     * @param options The player's options.
+     * @returns The created player.
+     */
+    createPlayer(guild: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Player;
+    /**
      * Creates a new player and connects it to the voice channel. Also checks channel permissions.
      * The player is not permanently saved or bound to the manager if it fails to connect or doesn't have sufficient permissions.
      * If a player for the specified guild already exists, it is returned and no new player is created. If it is disconnected, it is automatically connected.
