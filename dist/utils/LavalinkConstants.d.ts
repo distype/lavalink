@@ -10,7 +10,6 @@ export declare const LavalinkConstants: {
      * Required permission flags for a {@link Player player} to perform certain actions.
      */
     readonly REQUIRED_PERMISSIONS: {
-        readonly TEXT: readonly ["VIEW_CHANNEL", "SEND_MESSAGES", "EMBED_LINKS"];
         readonly VOICE: readonly ["VIEW_CHANNEL", "CONNECT", "SPEAK"];
         readonly VOICE_MOVED: readonly ["SPEAK"];
         readonly STAGE_BECOME_SPEAKER: readonly ["MUTE_MEMBERS"];

@@ -190,12 +190,11 @@ export declare class Manager extends TypedEmitter<ManagerEvents> {
      * The player is not permanently saved or bound to the manager if it fails to connect or doesn't have sufficient permissions.
      * If a player for the specified guild already exists, it is returned and no new player is created. If it is disconnected, it is automatically connected.
      * @param guild The player's guild.
-     * @param textChannel The player's text channel.
      * @param voiceChannel The player's voice channel.
      * @param options The player's options.
      * @returns The created player.
      */
-    preparePlayer(guild: Snowflake, textChannel: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Promise<Player>;
+    preparePlayer(guild: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions): Promise<Player>;
     /**
      * Get search results based on a query.
      * If the query is a link, it will attempt to get a track from the link. If not, it will return results from a search using the specified or default source.

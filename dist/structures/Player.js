@@ -49,10 +49,6 @@ class Player extends node_utils_1.TypedEmitter {
      */
     state = PlayerState.DISCONNECTED;
     /**
-     * The player's text channel.
-     */
-    textChannel;
-    /**
      * The current track's position. `null` if nothing is playing.
      */
     trackPosition = null;
@@ -101,18 +97,16 @@ class Player extends node_utils_1.TypedEmitter {
      * @param manager The player's {@link Manager manager}.
      * @param node The player's node.
      * @param guild The player's guild.
-     * @param textChannel The player's text channel.
      * @param voiceChannel The player's voice channel.
      * @param options The player's {@link PlayerOptions options}.
      * @param logCallback A {@link LogCallback callback} to be used for logging events internally in the player.
      * @param logThisArg A value to use as `this` in the `logCallback`.
      */
-    constructor(manager, node, guild, textChannel, voiceChannel, options = {}, logCallback = () => { }, logThisArg) {
+    constructor(manager, node, guild, voiceChannel, options = {}, logCallback = () => { }, logThisArg) {
         super();
         this.manager = manager;
         this.node = node;
         this.guild = guild;
-        this.textChannel = textChannel;
         this.voiceChannel = voiceChannel;
         this.options = {
             connectionTimeout: options.connectionTimeout ?? 15000,
