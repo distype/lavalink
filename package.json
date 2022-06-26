@@ -9,7 +9,7 @@
     "docs": "rm -rf ./docs && typedoc",
     "lint": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
-    "prepublishOnly": "npm run build:install"
+    "prepublishOnly": "npm i --also=dev && npm run build"
   },
   "keywords": [
     "api",
