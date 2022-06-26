@@ -194,10 +194,6 @@ export class Player extends TypedEmitter<PlayerEvents> {
      */
     public state: PlayerState = PlayerState.DISCONNECTED;
     /**
-     * The player's text channel.
-     */
-    public textChannel: Snowflake;
-    /**
      * The current track's position. `null` if nothing is playing.
      */
     public trackPosition: number | null = null;
@@ -249,19 +245,17 @@ export class Player extends TypedEmitter<PlayerEvents> {
      * @param manager The player's {@link Manager manager}.
      * @param node The player's node.
      * @param guild The player's guild.
-     * @param textChannel The player's text channel.
      * @param voiceChannel The player's voice channel.
      * @param options The player's {@link PlayerOptions options}.
      * @param logCallback A {@link LogCallback callback} to be used for logging events internally in the player.
      * @param logThisArg A value to use as `this` in the `logCallback`.
      */
-    constructor (manager: Manager, node: Node, guild: Snowflake, textChannel: Snowflake, voiceChannel: Snowflake, options: PlayerOptions = {}, logCallback: LogCallback = (): void => {}, logThisArg?: any) {
+    constructor (manager: Manager, node: Node, guild: Snowflake, voiceChannel: Snowflake, options: PlayerOptions = {}, logCallback: LogCallback = (): void => {}, logThisArg?: any) {
         super();
 
         this.manager = manager;
         this.node = node;
         this.guild = guild;
-        this.textChannel = textChannel;
         this.voiceChannel = voiceChannel;
         this.options = {
             connectionTimeout: options.connectionTimeout ?? 15000,

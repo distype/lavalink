@@ -10,7 +10,6 @@ export const LavalinkConstants = {
      * Required permission flags for a {@link Player player} to perform certain actions.
      */
     REQUIRED_PERMISSIONS: {
-        TEXT: [`VIEW_CHANNEL`, `SEND_MESSAGES`, `EMBED_LINKS`],
         VOICE: [`VIEW_CHANNEL`, `CONNECT`, `SPEAK`],
         VOICE_MOVED: [`SPEAK`],
         STAGE_BECOME_SPEAKER: [`MUTE_MEMBERS`],
