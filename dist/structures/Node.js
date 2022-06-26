@@ -22,6 +22,66 @@ var NodeState;
  */
 class Node extends node_utils_1.TypedEmitter {
     /**
+     * The node's {@link Manager manager}.
+     */
+    manager;
+    /**
+     * The node's {@link NodeState state.}
+     */
+    state = NodeState.IDLE;
+    /**
+     * The node's {@link NodeStats stats}.
+     */
+    stats = {
+        players: 0,
+        playingPlayers: 0,
+        uptime: 0,
+        memory: {
+            free: 0,
+            used: 0,
+            allocated: 0,
+            reservable: 0
+        },
+        cpu: {
+            cores: 0,
+            systemLoad: 0,
+            lavalinkLoad: 0
+        },
+        frameStats: {
+            sent: 0,
+            nulled: 0,
+            deficit: 0
+        }
+    };
+    /**
+     * The node's ID.
+     */
+    id;
+    /**
+     * {@link NodeOptions Options} for the node.
+     */
+    options;
+    /**
+     * The system string used for emitting errors and for the {@link LogCallback log callback}.
+     */
+    system;
+    /**
+     * If the node was killed. Set back to `false` when a new connection attempt is started.
+     */
+    _killed = false;
+    /**
+     * The {@link LogCallback log callback} used by the node.
+     */
+    _log;
+    /**
+     * If the node has an active spawn loop.
+     */
+    _spinning = false;
+    /**
+     * The websocket used.
+     */
+    _ws = null;
+    /**
      * Create a Lavalink node.
      * @param id The node's ID.
      * @param manager The node's {@link Manager manager}.
@@ -31,46 +91,6 @@ class Node extends node_utils_1.TypedEmitter {
      */
     constructor(id, manager, options, logCallback = () => { }, logThisArg) {
         super();
-        /**
-         * The node's {@link NodeState state.}
-         */
-        this.state = NodeState.IDLE;
-        /**
-         * The node's {@link NodeStats stats}.
-         */
-        this.stats = {
-            players: 0,
-            playingPlayers: 0,
-            uptime: 0,
-            memory: {
-                free: 0,
-                used: 0,
-                allocated: 0,
-                reservable: 0
-            },
-            cpu: {
-                cores: 0,
-                systemLoad: 0,
-                lavalinkLoad: 0
-            },
-            frameStats: {
-                sent: 0,
-                nulled: 0,
-                deficit: 0
-            }
-        };
-        /**
-         * If the node was killed. Set back to `false` when a new connection attempt is started.
-         */
-        this._killed = false;
-        /**
-         * If the node has an active spawn loop.
-         */
-        this._spinning = false;
-        /**
-         * The websocket used.
-         */
-        this._ws = null;
         this.id = id;
         this.system = `Lavalink Node ${id}`;
         this.manager = manager;

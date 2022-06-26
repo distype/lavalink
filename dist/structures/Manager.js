@@ -13,24 +13,40 @@ const distype_1 = require("distype");
  */
 class Manager extends node_utils_1.TypedEmitter {
     /**
+     * The client used by the manager.
+     */
+    client;
+    /**
+     * The manager's nodes.
+     */
+    nodes = new node_utils_1.ExtendedMap();
+    /**
+     * The manager's players.
+     */
+    players = new node_utils_1.ExtendedMap();
+    /**
+     * {@link ManagerOptions Options} for the manager.
+     */
+    options;
+    /**
+     * The system string used for emitting errors and for the {@link LogCallback log callback}.
+     */
+    system = `Lavalink Manager`;
+    /**
+     * The {@link LogCallback log callback} used by the node.
+     */
+    _log;
+    /**
+     * A value to use as `this` in the `this#_log`.
+     */
+    _logThisArg;
+    /**
      * Create a lavalink manager.
      * @param client The manager's Distype client.
      * @param options The {@link ManagerOptions options} to use for the manager.
      */
     constructor(client, options, logCallback = () => { }, logThisArg) {
         super();
-        /**
-         * The manager's nodes.
-         */
-        this.nodes = new node_utils_1.ExtendedMap();
-        /**
-         * The manager's players.
-         */
-        this.players = new node_utils_1.ExtendedMap();
-        /**
-         * The system string used for emitting errors and for the {@link LogCallback log callback}.
-         */
-        this.system = `Lavalink Manager`;
         this.client = client;
         this.options = {
             clientName: options.clientName ?? `@distype/lavalink`,

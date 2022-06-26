@@ -6,6 +6,51 @@ exports.Track = void 0;
  */
 class Track {
     /**
+     * The track's requester.
+     * This value can be anything, and solely exists for your convenience.
+     */
+    requester;
+    /**
+     * The track encoded into base64.
+     */
+    track;
+    /**
+     * The track's identifier.
+     */
+    identifier;
+    /**
+     * If the track is seekable.
+     */
+    isSeekable;
+    /**
+     * The track's author.
+     */
+    author;
+    /**
+     * The length of the track in milliseconds.
+     */
+    length;
+    /**
+     * If the track is a stream.
+     */
+    isStream;
+    /**
+     * The current position in the track, in milliseconds.
+     */
+    position;
+    /**
+     * The track's title.
+     */
+    title;
+    /**
+     * The track's URI.
+     */
+    uri;
+    /**
+     * The name of the track's source.
+     */
+    sourceName;
+    /**
      * Create a new track.
      * @param data Track data from the server.
      * @param requester The track's requester. This value can be anything, and solely exists for your convenience.

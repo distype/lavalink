@@ -96,6 +96,14 @@ var DistypeLavalinkErrorType;
  */
 class DistypeLavalinkError extends Error {
     /**
+     * The type of error that has ocurred.
+     */
+    errorType;
+    /**
+     * The system the error was emitted from.
+     */
+    system;
+    /**
      * Create a `@distype/lavalink` error.
      * @param message The error's message.
      * @param errorType The type of error that has ocurred.

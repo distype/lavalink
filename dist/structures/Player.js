@@ -21,6 +21,82 @@ var PlayerState;
  */
 class Player extends node_utils_1.TypedEmitter {
     /**
+     * The player's {@link PlayerFilters filters}.
+     */
+    filters = {};
+    /**
+     * The player's current {@link PlayerLoopType loop behavior}.
+     */
+    loop = `off`;
+    /**
+     * The player's {@link Manager manager}.
+     */
+    manager;
+    /**
+     * The player's {@link Node node}.
+     */
+    node;
+    /**
+     * The queue.
+     */
+    queue = [];
+    /**
+     * The current song playing, represented as an index of Player#queue. This is null if there isn't a song currently playing.
+     */
+    queuePosition = null;
+    /**
+     * The player's {@link PlayerState state}.
+     */
+    state = PlayerState.DISCONNECTED;
+    /**
+     * The player's text channel.
+     */
+    textChannel;
+    /**
+     * The current track's position. `null` if nothing is playing.
+     */
+    trackPosition = null;
+    /**
+     * The player's voice channel.
+     */
+    voiceChannel;
+    /**
+     * The player's volume.
+     */
+    volume = 100;
+    /**
+     * The player's guild.
+     */
+    guild;
+    /**
+     * {@link PlayerOptions Options} for the player.
+     */
+    options;
+    /**
+     * The system string used for emitting errors and for the {@link LogCallback log callback}.
+     */
+    system;
+    /**
+     * If the bot is a speaker. Only applicable if the voice channel is a stage.
+     */
+    _isSpeaker = null;
+    /**
+     * If the connected voice channel is a stage.
+     */
+    _isStage = null;
+    /**
+     * The {@link LogCallback log callback} used by the node.
+     */
+    _log;
+    /**
+     * A helper variable for setting the player's state after sending a play op with pause set to true.
+     */
+    _sentPausedPlay = null;
+    /**
+     * If the player is connecting.
+     */
+    _spinning = false;
+    /**
      * Create a Lavalink player.
      * @param manager The player's {@link Manager manager}.
      * @param node The player's node.
@@ -33,50 +109,6 @@ class Player extends node_utils_1.TypedEmitter {
      */
     constructor(manager, node, guild, textChannel, voiceChannel, options = {}, logCallback = () => { }, logThisArg) {
         super();
-        /**
-         * The player's {@link PlayerFilters filters}.
-         */
-        this.filters = {};
-        /**
-         * The player's current {@link PlayerLoopType loop behavior}.
-         */
-        this.loop = `off`;
-        /**
-         * The queue.
-         */
-        this.queue = [];
-        /**
-         * The current song playing, represented as an index of Player#queue. This is null if there isn't a song currently playing.
-         */
-        this.queuePosition = null;
-        /**
-         * The player's {@link PlayerState state}.
-         */
-        this.state = PlayerState.DISCONNECTED;
-        /**
-         * The current track's position. `null` if nothing is playing.
-         */
-        this.trackPosition = null;
-        /**
-         * The player's volume.
-         */
-        this.volume = 100;
-        /**
-         * If the bot is a speaker. Only applicable if the voice channel is a stage.
-         */
-        this._isSpeaker = null;
-        /**
-         * If the connected voice channel is a stage.
-         */
-        this._isStage = null;
-        /**
-         * A helper variable for setting the player's state after sending a play op with pause set to true.
-         */
-        this._sentPausedPlay = null;
-        /**
-         * If the player is connecting.
-         */
-        this._spinning = false;
         this.manager = manager;
         this.node = node;
         this.guild = guild;
