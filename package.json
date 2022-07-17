@@ -9,7 +9,7 @@
     "docs": "rimraf ./docs && typedoc",
     "lint": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
-    "prepublishOnly": "npm i --also=dev && npm run build"
+    "prepublishOnly": "npm i --include=dev && npm run build"
   },
   "keywords": [
     "api",
