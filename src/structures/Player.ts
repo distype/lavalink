@@ -298,13 +298,18 @@ export class Player extends TypedEmitter<PlayerEvents> {
         if (this.state >= PlayerState.CONNECTED) return;
 
         const permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
-        if (!PermissionsUtils.hasPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.VOICE)) {
-            throw new DistypeLavalinkError(`Missing one of the following permissions in the voice channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.VOICE.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+
+        const voiceMissingPerms = PermissionsUtils.missingPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.VOICE);
+        if (voiceMissingPerms !== 0n) {
+            throw new DistypeLavalinkError(`Missing the following permissions in the voice channel: ${PermissionsUtils.toReadable(voiceMissingPerms).join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
 
         const voiceChannel = await this.manager.client.getChannelData(this.voiceChannel, `type`);
-        if (voiceChannel.type === ChannelType.GuildStageVoice && !PermissionsUtils.hasPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !PermissionsUtils.hasPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
-            throw new DistypeLavalinkError(`Missing one of the following permissions in the stage channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+
+        const stageSpeakerMissingPerms = PermissionsUtils.missingPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER);
+        const stageRequestMissingPerms = PermissionsUtils.missingPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST);
+        if (voiceChannel.type === ChannelType.GuildStageVoice && stageSpeakerMissingPerms !== 0n && stageRequestMissingPerms !== 0n) {
+            throw new DistypeLavalinkError(`Missing the following permissions in the stage channel: ${PermissionsUtils.toReadable(stageSpeakerMissingPerms).join(`, `)} or ${PermissionsUtils.toReadable(stageRequestMissingPerms).join(`, `)}`, DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
         }
 
         this._spinning = true;
@@ -666,16 +671,19 @@ export class Player extends TypedEmitter<PlayerEvents> {
                     this._isStage = true;
                     this._isSpeaker = data.suppress;
 
-                    if (!PermissionsUtils.hasPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER) && !PermissionsUtils.hasPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST)) {
-                        return this.destroy(`Missing one of the following permissions in the new stage channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER.join(`, `)} or ${LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST.join(`, `)}`);
+                    const stageSpeakerMissingPerms = PermissionsUtils.missingPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER);
+                    const stageRequestMissingPerms = PermissionsUtils.missingPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST);
+                    if (stageSpeakerMissingPerms !== 0n && stageRequestMissingPerms !== 0n) {
+                        return this.destroy(`Missing the following permissions in the new stage channel: ${PermissionsUtils.toReadable(stageSpeakerMissingPerms).join(`, `)} or ${PermissionsUtils.toReadable(stageRequestMissingPerms).join(`, `)}`);
                     }
                 } else {
                     this._isStage = false;
                     this._isSpeaker = null;
                 }
 
-                if (!PermissionsUtils.hasPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.VOICE_MOVED)) {
-                    return this.destroy(`Missing one of the following permissions in the new voice channel: ${LavalinkConstants.REQUIRED_PERMISSIONS.VOICE_MOVED.join(`, `)}`);
+                const voiceMissingPerms = PermissionsUtils.missingPerms(permissions, ...LavalinkConstants.REQUIRED_PERMISSIONS.VOICE);
+                if (voiceMissingPerms !== 0n) {
+                    return this.destroy(`Missing the following permissions in the voice channel: ${PermissionsUtils.toReadable(voiceMissingPerms).join(`, `)}`);
                 }
             }
 
