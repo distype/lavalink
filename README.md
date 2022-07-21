@@ -1,7 +1,6 @@
 <div align="center">
     <br>
     <h1>@distype/lavalink</h1>
-    <br><br>
     <p>
         <a href="https://www.npmjs.com/package/@distype/lavalink"><img src="https://img.shields.io/npm/v/@distype/lavalink.svg?color=5162F&style=for-the-badge&logo=npm"></a>
         <a href="https://github.com/distype/lavalink/actions/workflows/build.yml"><img src="https://img.shields.io/github/workflow/status/distype/lavalink/Build?style=for-the-badge&logo=github"><a>
