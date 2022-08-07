@@ -1,5 +1,4 @@
 import { Manager } from './Manager';
-import { LogCallback } from '../types/Log';
 import { TypedEmitter } from '@br88c/node-utils';
 import { RestMethod, RestRoute } from 'distype';
 import { request } from 'undici';
@@ -184,17 +183,13 @@ export declare class Node extends TypedEmitter<NodeEvents> {
      */
     readonly options: Required<NodeOptions>;
     /**
-     * The system string used for emitting errors and for the {@link LogCallback log callback}.
+     * The system string used for logging.
      */
     readonly system: `Lavalink Node ${number}`;
     /**
      * If the node was killed. Set back to `false` when a new connection attempt is started.
      */
     private _killed;
-    /**
-     * The {@link LogCallback log callback} used by the node.
-     */
-    private _log;
     /**
      * If the node has an active spawn loop.
      */
@@ -208,10 +203,8 @@ export declare class Node extends TypedEmitter<NodeEvents> {
      * @param id The node's ID.
      * @param manager The node's {@link Manager manager}.
      * @param options The node's {@link NodeOptions options}.
-     * @param logCallback A {@link LogCallback callback} to be used for logging events internally in the node.
-     * @param logThisArg A value to use as `this` in the `logCallback`.
      */
-    constructor(id: number, manager: Manager, options: NodeOptions, logCallback?: LogCallback, logThisArg?: any);
+    constructor(id: number, manager: Manager, options: NodeOptions);
     /**
      * Connect to the node.
      * The node must be in a {@link NodeState DISCONNECTED} state.

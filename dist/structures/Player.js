@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Player = exports.PlayerState = void 0;
-const DistypeLavalinkError_1 = require("../errors/DistypeLavalinkError");
 const LavalinkConstants_1 = require("../utils/LavalinkConstants");
 const node_utils_1 = require("@br88c/node-utils");
 const v10_1 = require("discord-api-types/v10");
@@ -69,7 +68,7 @@ class Player extends node_utils_1.TypedEmitter {
      */
     options;
     /**
-     * The system string used for emitting errors and for the {@link LogCallback log callback}.
+     * The system string used for logging.
      */
     system;
     /**
@@ -80,10 +79,6 @@ class Player extends node_utils_1.TypedEmitter {
      * If the connected voice channel is a stage.
      */
     _isStage = null;
-    /**
-     * The {@link LogCallback log callback} used by the node.
-     */
-    _log;
     /**
      * A helper variable for setting the player's state after sending a play op with pause set to true.
      */
@@ -99,10 +94,8 @@ class Player extends node_utils_1.TypedEmitter {
      * @param guild The player's guild.
      * @param voiceChannel The player's voice channel.
      * @param options The player's {@link PlayerOptions options}.
-     * @param logCallback A {@link LogCallback callback} to be used for logging events internally in the player.
-     * @param logThisArg A value to use as `this` in the `logCallback`.
      */
-    constructor(manager, node, guild, voiceChannel, options = {}, logCallback = () => { }, logThisArg) {
+    constructor(manager, node, guild, voiceChannel, options = {}) {
         super();
         this.manager = manager;
         this.node = node;
@@ -113,8 +106,7 @@ class Player extends node_utils_1.TypedEmitter {
             selfDeafen: options.selfDeafen ?? true
         };
         this.system = `Lavalink Player ${this.guild}`;
-        this._log = logCallback.bind(logThisArg);
-        this._log(`Initialized player ${this.guild}`, {
+        this.manager.client.log(`Initialized player ${this.guild}`, {
             level: `DEBUG`, system: this.system
         });
     }
@@ -141,28 +133,28 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async connect() {
         if (this._spinning)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Player is already connecting`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_ALREADY_CONNECTING, this.system);
+            throw new Error(`Player is already connecting`);
         if (this.state >= PlayerState.CONNECTED)
             return;
         const permissions = await this.manager.client.getSelfPermissions(this.guild, this.voiceChannel);
         const voiceMissingPerms = distype_1.PermissionsUtils.missingPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.VOICE);
         if (voiceMissingPerms !== 0n) {
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Missing the following permissions in the voice channel: ${distype_1.PermissionsUtils.toReadable(voiceMissingPerms).join(`, `)}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+            throw new Error(`Missing the following permissions in the voice channel: ${distype_1.PermissionsUtils.toReadable(voiceMissingPerms).join(`, `)}`);
         }
         const voiceChannel = await this.manager.client.getChannelData(this.voiceChannel, `type`);
         const stageSpeakerMissingPerms = distype_1.PermissionsUtils.missingPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_BECOME_SPEAKER);
         const stageRequestMissingPerms = distype_1.PermissionsUtils.missingPerms(permissions, ...LavalinkConstants_1.LavalinkConstants.REQUIRED_PERMISSIONS.STAGE_REQUEST);
         if (voiceChannel.type === v10_1.ChannelType.GuildStageVoice && stageSpeakerMissingPerms !== 0n && stageRequestMissingPerms !== 0n) {
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Missing the following permissions in the stage channel: ${distype_1.PermissionsUtils.toReadable(stageSpeakerMissingPerms).join(`, `)} or ${distype_1.PermissionsUtils.toReadable(stageRequestMissingPerms).join(`, `)}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_MISSING_PERMISSIONS, this.system);
+            throw new Error(`Missing the following permissions in the stage channel: ${distype_1.PermissionsUtils.toReadable(stageSpeakerMissingPerms).join(`, `)} or ${distype_1.PermissionsUtils.toReadable(stageRequestMissingPerms).join(`, `)}`);
         }
         this._spinning = true;
-        this._log(`Connecting to voice channel ${this.voiceChannel}`, {
+        this.manager.client.log(`Connecting to voice channel ${this.voiceChannel}`, {
             level: `DEBUG`, system: this.system
         });
         this.manager.client.gateway.updateVoiceState(this.guild, this.voiceChannel, false, this.options.selfDeafen);
         const result = await new Promise((resolve, reject) => {
             const onConnected = async () => {
-                this._log(`Connected to voice channel ${this.voiceChannel}`, {
+                this.manager.client.log(`Connected to voice channel ${this.voiceChannel}`, {
                     level: `DEBUG`, system: this.system
                 });
                 if (voiceChannel.type === v10_1.ChannelType.GuildStageVoice) {
@@ -173,7 +165,7 @@ class Player extends node_utils_1.TypedEmitter {
                             suppress: false
                         });
                         this._isSpeaker = true;
-                        this._log(`Unsuppressed in stage`, {
+                        this.manager.client.log(`Unsuppressed in stage`, {
                             level: `DEBUG`, system: this.system
                         });
                     }
@@ -183,7 +175,7 @@ class Player extends node_utils_1.TypedEmitter {
                             request_to_speak_timestamp: new Date().toISOString()
                         });
                         this._isSpeaker = false;
-                        this._log(`Requested to speak in stage`, {
+                        this.manager.client.log(`Requested to speak in stage`, {
                             level: `DEBUG`, system: this.system
                         });
                     }
@@ -202,13 +194,13 @@ class Player extends node_utils_1.TypedEmitter {
                 if (timedOut)
                     clearTimeout(timedOut);
                 this._spinning = false;
-                reject(new DistypeLavalinkError_1.DistypeLavalinkError(`Failed to connect to the voice channel, Player was destroyed: ${reason}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_VOICE_CONNECTION_FAILED, this.system));
+                reject(new Error(`Failed to connect to the voice channel, Player was destroyed: ${reason}`));
             };
             const timedOut = setTimeout(() => {
                 this.removeListener(`VOICE_CONNECTED`, onConnected);
                 this.removeListener(`DESTROYED`, onDestroy);
                 this._spinning = false;
-                reject(new DistypeLavalinkError_1.DistypeLavalinkError(`Timed out while connecting to the voice channel`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_VOICE_CONNECTION_FAILED, this.system));
+                reject(new Error(`Timed out while connecting to the voice channel`));
             }, this.options.connectionTimeout).unref();
             this.once(`VOICE_CONNECTED`, onConnected);
             this.once(`DESTROYED`, onDestroy);
@@ -231,16 +223,16 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async play(track, options) {
         if (this.state < PlayerState.CONNECTED)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot play when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot play when the player isn't in a connected, paused, or playing state`);
         if (track instanceof Array) {
             this.queue.push(...track);
-            this._log(`Added ${track.length} tracks to the queue`, {
+            this.manager.client.log(`Added ${track.length} tracks to the queue`, {
                 level: `DEBUG`, system: this.system
             });
         }
         else {
             this.queue.push(track);
-            this._log(`Added "${track.identifier}" to the queue`, {
+            this.manager.client.log(`Added "${track.identifier}" to the queue`, {
                 level: `DEBUG`, system: this.system
             });
         }
@@ -262,11 +254,11 @@ class Player extends node_utils_1.TypedEmitter {
             op: `destroy`,
             guildId: this.guild
         }).catch((error) => {
-            this._log(`Unable to send destroy payload to node ${this.node.id}: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+            this.manager.client.log(`Unable to send destroy payload to node ${this.node.id}: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                 level: `WARN`, system: this.system
             });
         });
-        this._log(`DESTROYED: ${reason}`, {
+        this.manager.client.log(`DESTROYED: ${reason}`, {
             level: `DEBUG`, system: this.system
         });
         this.emit(`DESTROYED`, reason);
@@ -279,19 +271,19 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async skip(index) {
         if (this.state < PlayerState.CONNECTED)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot skip when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot skip when the player isn't in a connected, paused, or playing state`);
         if (typeof index === `number`) {
             if (index < 0 || index >= this.queue.length)
-                throw new DistypeLavalinkError_1.DistypeLavalinkError(`Invalid index`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_INVALID_SKIP_POSITION, this.system);
+                throw new Error(`Invalid index`);
             await this._play(this.queue[index]);
             this.queuePosition = index;
-            this._log(`Skipped to index ${index}`, {
+            this.manager.client.log(`Skipped to index ${index}`, {
                 level: `DEBUG`, system: this.system
             });
         }
         else {
             await this._advanceQueue();
-            this._log(`Skipped to the next track`, {
+            this.manager.client.log(`Skipped to the next track`, {
                 level: `DEBUG`, system: this.system
             });
         }
@@ -301,12 +293,12 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async shuffle() {
         if (this.state < PlayerState.CONNECTED)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot shuffle when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot shuffle when the player isn't in a connected, paused, or playing state`);
         await this._stop();
         this.queue = (0, node_utils_1.shuffleArray)(this.queue);
         this.queuePosition = 0;
         await this._play(this.queue[0]);
-        this._log(`Shuffled`, {
+        this.manager.client.log(`Shuffled`, {
             level: `DEBUG`, system: this.system
         });
     }
@@ -316,15 +308,15 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async seek(position) {
         if (this.state < PlayerState.CONNECTED)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot seek when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot seek when the player isn't in a connected, paused, or playing state`);
         if (position < 0)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Position must be greater than 0`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_INVALID_SEEK_POSITION, this.system);
+            throw new Error(`Position must be greater than 0`);
         await this.node.send({
             op: `seek`,
             guildId: this.guild,
             position
         });
-        this._log(`Seeked to ${position}ms`, {
+        this.manager.client.log(`Seeked to ${position}ms`, {
             level: `DEBUG`, system: this.system
         });
     }
@@ -333,14 +325,14 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async pause() {
         if (this.state < PlayerState.CONNECTED)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot pause when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot pause when the player isn't in a connected, paused, or playing state`);
         await this.node.send({
             op: `pause`,
             guildId: this.guild,
             pause: true
         });
         this.state = PlayerState.PAUSED;
-        this._log(`PAUSED`, {
+        this.manager.client.log(`PAUSED`, {
             level: `DEBUG`, system: this.system
         });
         this.emit(`PAUSED`);
@@ -350,14 +342,14 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async resume() {
         if (this.state < PlayerState.CONNECTED)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot resume when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot resume when the player isn't in a connected, paused, or playing state`);
         await this.node.send({
             op: `pause`,
             guildId: this.guild,
             pause: false
         });
         this.state = PlayerState.PLAYING;
-        this._log(`RESUMED`, {
+        this.manager.client.log(`RESUMED`, {
             level: `DEBUG`, system: this.system
         });
         this.emit(`RESUMED`);
@@ -367,7 +359,7 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async stop() {
         if (this.state < PlayerState.CONNECTED)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot stop when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot stop when the player isn't in a connected, paused, or playing state`);
         await this._stop();
         this.queuePosition = null;
     }
@@ -387,7 +379,7 @@ class Player extends node_utils_1.TypedEmitter {
             else
                 await this.stop();
         }
-        this._log(`Removed track ${removedTrack.identifier}`, {
+        this.manager.client.log(`Removed track ${removedTrack.identifier}`, {
             level: `DEBUG`, system: this.system
         });
         return removedTrack;
@@ -414,9 +406,9 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async setVolume(volume) {
         if (this.state < PlayerState.CONNECTED)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot set volume when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot set volume when the player isn't in a connected, paused, or playing state`);
         if (volume < LavalinkConstants_1.LavalinkConstants.VOLUME.MIN || volume > LavalinkConstants_1.LavalinkConstants.VOLUME.MAX)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Volume must be between ${LavalinkConstants_1.LavalinkConstants.VOLUME.MIN} and ${LavalinkConstants_1.LavalinkConstants.VOLUME.MAX}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_VOLUME_OUT_OF_RANGE, this.system);
+            throw new Error(`Volume must be between ${LavalinkConstants_1.LavalinkConstants.VOLUME.MIN} and ${LavalinkConstants_1.LavalinkConstants.VOLUME.MAX}`);
         await this.node.send({
             op: `volume`,
             guildId: this.guild,
@@ -431,7 +423,7 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async setFilters(filters) {
         if (this.state < PlayerState.CONNECTED)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot set filters when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot set filters when the player isn't in a connected, paused, or playing state`);
         await this.node.send(Object.assign({
             op: `filters`,
             guildId: this.guild
@@ -447,7 +439,7 @@ class Player extends node_utils_1.TypedEmitter {
     async handleMove(data) {
         if (this.state === PlayerState.DISCONNECTED) {
             if (data.channel_id === this.voiceChannel) {
-                this._log(`VOICE_CONNECTED: Channel ${this.voiceChannel}`, {
+                this.manager.client.log(`VOICE_CONNECTED: Channel ${this.voiceChannel}`, {
                     level: `DEBUG`, system: this.system
                 });
                 this.emit(`VOICE_CONNECTED`, this.voiceChannel);
@@ -461,7 +453,7 @@ class Player extends node_utils_1.TypedEmitter {
             let permissions;
             if (this.voiceChannel !== data.channel_id) {
                 this.voiceChannel = data.channel_id;
-                this._log(`VOICE_MOVED: New channel ${this.voiceChannel}`, {
+                this.manager.client.log(`VOICE_MOVED: New channel ${this.voiceChannel}`, {
                     level: `DEBUG`, system: this.system
                 });
                 this.emit(`VOICE_MOVED`, this.voiceChannel);
@@ -499,7 +491,7 @@ class Player extends node_utils_1.TypedEmitter {
                     this._isSpeaker = false;
                     if (!this.paused)
                         await this.pause().catch((error) => {
-                            this._log(`Unable to pause after being suppressed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                            this.manager.client.log(`Unable to pause after being suppressed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                                 level: `WARN`, system: this.system
                             });
                         });
@@ -518,13 +510,13 @@ class Player extends node_utils_1.TypedEmitter {
                             this._isSpeaker = true;
                             if (this.paused)
                                 await this.resume().catch((error) => {
-                                    this._log(`Unable to resume after being suppressed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                                    this.manager.client.log(`Unable to resume after being suppressed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                                         level: `WARN`, system: this.system
                                     });
                                 });
                         })
                             .catch((error) => {
-                            this._log(`Unable to become a speaker after being suppressed in the stage: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                            this.manager.client.log(`Unable to become a speaker after being suppressed in the stage: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                                 level: `WARN`, system: this.system
                             });
                         });
@@ -534,7 +526,7 @@ class Player extends node_utils_1.TypedEmitter {
                             channel_id: this.voiceChannel,
                             request_to_speak_timestamp: new Date().toISOString()
                         }).catch((error) => {
-                            this._log(`Unable to raise hand after being suppressed in the stage: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                            this.manager.client.log(`Unable to raise hand after being suppressed in the stage: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                                 level: `WARN`, system: this.system
                             });
                         });
@@ -544,7 +536,7 @@ class Player extends node_utils_1.TypedEmitter {
                     this._isSpeaker = true;
                     if (this.paused)
                         await this.resume().catch((error) => {
-                            this._log(`Unable to resume after being suppressed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                            this.manager.client.log(`Unable to resume after being suppressed: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                                 level: `WARN`, system: this.system
                             });
                         });
@@ -565,7 +557,7 @@ class Player extends node_utils_1.TypedEmitter {
         }
         else if (payload.op === `event`) {
             const track = typeof payload.track === `string` ? (await this.manager.decodeTracks(payload.track).catch((error) => {
-                this._log(`Unable to decode track from payload: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                this.manager.client.log(`Unable to decode track from payload: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                     level: `WARN`, system: this.system
                 });
                 return [];
@@ -576,13 +568,13 @@ class Player extends node_utils_1.TypedEmitter {
                 case `TrackEndEvent`: {
                     this.trackPosition = null;
                     this.state = PlayerState.CONNECTED;
-                    this._log(`TRACK_END: ${payload.reason} (${track?.identifier})`, {
+                    this.manager.client.log(`TRACK_END: ${payload.reason} (${track?.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
                     this.emit(`TRACK_END`, payload.reason, track);
                     if (payload.reason !== `STOPPED` && payload.reason !== `REPLACED`) {
                         this._advanceQueue().catch((error) => {
-                            this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                            this.manager.client.log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                                 level: `ERROR`, system: this.system
                             });
                         });
@@ -590,21 +582,21 @@ class Player extends node_utils_1.TypedEmitter {
                     break;
                 }
                 case `TrackExceptionEvent`: {
-                    this._log(`TRACK_EXCEPTION: ${payload.exception.message} (Severity ${payload.exception.severity}, track ${track?.identifier}), caused by "${payload.exception.cause}"`, {
+                    this.manager.client.log(`TRACK_EXCEPTION: ${payload.exception.message} (Severity ${payload.exception.severity}, track ${track?.identifier}), caused by "${payload.exception.cause}"`, {
                         level: `DEBUG`, system: this.system
                     });
                     this.emit(`TRACK_EXCEPTION`, payload.exception.message, payload.exception.severity, payload.exception.cause, track);
                     break;
                 }
                 case `TrackStartEvent`: {
-                    this._log(`TRACK_START (${track?.identifier})`, {
+                    this.manager.client.log(`TRACK_START (${track?.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
                     this.emit(`TRACK_START`, track);
                     if (this._sentPausedPlay) {
                         this._sentPausedPlay = null;
                         this.state = PlayerState.PAUSED;
-                        this._log(`PAUSED`, {
+                        this.manager.client.log(`PAUSED`, {
                             level: `DEBUG`, system: this.system
                         });
                         this.emit(`PAUSED`);
@@ -614,24 +606,24 @@ class Player extends node_utils_1.TypedEmitter {
                     break;
                 }
                 case `TrackStuckEvent`: {
-                    this._log(`TRACK_STUCK: Threshold ${payload.thresholdMs}ms (${track?.identifier})`, {
+                    this.manager.client.log(`TRACK_STUCK: Threshold ${payload.thresholdMs}ms (${track?.identifier})`, {
                         level: `DEBUG`, system: this.system
                     });
                     this.emit(`TRACK_STUCK`, payload.thresholdMs, track);
                     await this._stop().catch((error) => {
-                        this._log(`Unable to stop the current track after TRACK_STUCK: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                        this.manager.client.log(`Unable to stop the current track after TRACK_STUCK: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                             level: `WARN`, system: this.system
                         });
                     });
                     await this._advanceQueue().catch((error) => {
-                        this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                        this.manager.client.log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                             level: `ERROR`, system: this.system
                         });
                     });
                     break;
                 }
                 case `WebSocketClosedEvent`: {
-                    this._log(`WEBSOCKET_CLOSED: Code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `, "${payload.reason}"` : ``}${payload.byRemove ? `, by remote` : ``}`, {
+                    this.manager.client.log(`WEBSOCKET_CLOSED: Code ${payload.code ?? `[Unknown]`}${payload.reason?.length ? `, "${payload.reason}"` : ``}${payload.byRemove ? `, by remote` : ``}`, {
                         level: `WARN`, system: this.system
                     });
                     this.emit(`WEBSOCKET_CLOSED`, payload.code, payload.reason, payload.byRemote);
@@ -645,12 +637,12 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async _advanceQueue() {
         if (this.state < PlayerState.CONNECTED) {
-            this._log(`Unable to advance the queue, the player isn't in a connected, paused, or playing state`, {
+            this.manager.client.log(`Unable to advance the queue, the player isn't in a connected, paused, or playing state`, {
                 level: `WARN`, system: this.system
             });
             return;
         }
-        this._log(`Advancing the queue... (Loop type: ${this.loop})`, {
+        this.manager.client.log(`Advancing the queue... (Loop type: ${this.loop})`, {
             level: `DEBUG`, system: this.system
         });
         if (this.queuePosition === null) {
@@ -664,13 +656,13 @@ class Player extends node_utils_1.TypedEmitter {
         }
         if (this.currentTrack) {
             this._play(this.currentTrack).catch(async (error) => {
-                this._log(`Unable to play next track "${this.currentTrack?.identifier}": ${(error?.message ?? error) ?? `Unknown reason`}, skipping...`, {
+                this.manager.client.log(`Unable to play next track "${this.currentTrack?.identifier}": ${(error?.message ?? error) ?? `Unknown reason`}, skipping...`, {
                     level: `WARN`, system: this.system
                 });
                 if (this.loop === `single`)
                     this.queuePosition++;
                 await this._advanceQueue().catch((error) => {
-                    this._log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
+                    this.manager.client.log(`Unable to advance the queue: ${(error?.message ?? error) ?? `Unknown reason`}`, {
                         level: `ERROR`, system: this.system
                     });
                 });
@@ -679,12 +671,12 @@ class Player extends node_utils_1.TypedEmitter {
         else {
             if (this.state > PlayerState.CONNECTED)
                 await this._stop().catch(() => {
-                    this._log(`Unable to stop while advancing the queue to an undefined track`, {
+                    this.manager.client.log(`Unable to stop while advancing the queue to an undefined track`, {
                         level: `WARN`, system: this.system
                     });
                 });
             this.queuePosition = null;
-            this._log(`Reached end of the queue`, {
+            this.manager.client.log(`Reached end of the queue`, {
                 level: `DEBUG`, system: this.system
             });
         }
@@ -696,10 +688,10 @@ class Player extends node_utils_1.TypedEmitter {
      */
     async _play(track, options) {
         if (this.state !== PlayerState.CONNECTED && this.state !== PlayerState.PAUSED && this.state !== PlayerState.PLAYING)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`Cannot play when the player isn't in a connected, paused, or playing state`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_STATE_CONFLICT, this.system);
+            throw new Error(`Cannot play when the player isn't in a connected, paused, or playing state`);
         if (typeof options?.volume === `number`) {
             if (options.volume < LavalinkConstants_1.LavalinkConstants.VOLUME.MIN || options.volume > LavalinkConstants_1.LavalinkConstants.VOLUME.MAX)
-                throw new DistypeLavalinkError_1.DistypeLavalinkError(`Volume must be between ${LavalinkConstants_1.LavalinkConstants.VOLUME.MIN} and ${LavalinkConstants_1.LavalinkConstants.VOLUME.MAX}`, DistypeLavalinkError_1.DistypeLavalinkErrorType.PLAYER_VOLUME_OUT_OF_RANGE, this.system);
+                throw new Error(`Volume must be between ${LavalinkConstants_1.LavalinkConstants.VOLUME.MIN} and ${LavalinkConstants_1.LavalinkConstants.VOLUME.MAX}`);
             this.volume = options.volume;
             if (options.volume === LavalinkConstants_1.LavalinkConstants.VOLUME.DEFAULT)
                 delete options.volume;
@@ -715,7 +707,7 @@ class Player extends node_utils_1.TypedEmitter {
             guildId: this.guild,
             track: track.track
         }, options));
-        this._log(`Playing ${track.identifier}`, {
+        this.manager.client.log(`Playing ${track.identifier}`, {
             level: `DEBUG`, system: this.system
         });
     }

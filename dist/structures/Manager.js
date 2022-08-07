@@ -4,7 +4,6 @@ exports.Manager = void 0;
 const Node_1 = require("./Node");
 const Player_1 = require("./Player");
 const Track_1 = require("./Track");
-const DistypeLavalinkError_1 = require("../errors/DistypeLavalinkError");
 const node_utils_1 = require("@br88c/node-utils");
 /**
  * The Lavalink manager.
@@ -27,23 +26,15 @@ class Manager extends node_utils_1.TypedEmitter {
      */
     options;
     /**
-     * The system string used for emitting errors and for the {@link LogCallback log callback}.
+     * The system string used for logging.
      */
     system = `Lavalink Manager`;
-    /**
-     * The {@link LogCallback log callback} used by the node.
-     */
-    _log;
-    /**
-     * A value to use as `this` in the `this#_log`.
-     */
-    _logThisArg;
     /**
      * Create a lavalink manager.
      * @param client The manager's Distype client.
      * @param options The {@link ManagerOptions options} to use for the manager.
      */
-    constructor(client, options, logCallback = () => { }, logThisArg) {
+    constructor(client, options) {
         super();
         this.client = client;
         this.options = {
@@ -53,7 +44,7 @@ class Manager extends node_utils_1.TypedEmitter {
             leastLoadSort: options.leastLoadSort ?? `system`
         };
         options.nodeOptions.forEach((nodeOptions, i) => {
-            const node = new Node_1.Node(i, this, nodeOptions, logCallback, logThisArg);
+            const node = new Node_1.Node(i, this, nodeOptions);
             this.nodes.set(i, node);
             node.on(`RECEIVED_MESSAGE`, (payload) => {
                 this.emit(`NODE_RECEIVED_MESSAGE`, payload);
@@ -69,9 +60,7 @@ class Manager extends node_utils_1.TypedEmitter {
         });
         this.client.gateway.on(`VOICE_SERVER_UPDATE`, this._handleVoiceServerUpdate.bind(this));
         this.client.gateway.on(`VOICE_STATE_UPDATE`, this._handleVoiceStateUpdate.bind(this));
-        this._log = logCallback.bind(logThisArg);
-        this._logThisArg = logThisArg;
-        this._log(`Initialized manager`, {
+        this.client.log(`Initialized manager`, {
             level: `DEBUG`, system: this.system
         });
     }
@@ -89,7 +78,7 @@ class Manager extends node_utils_1.TypedEmitter {
      * @returns The results of node connection attempts.
      */
     async spawnNodes() {
-        this._log(`Spawning ${this.nodes.size} nodes`, {
+        this.client.log(`Spawning ${this.nodes.size} nodes`, {
             level: `INFO`, system: this.system
         });
         const connect = [];
@@ -97,11 +86,11 @@ class Manager extends node_utils_1.TypedEmitter {
         const results = await Promise.allSettled(connect);
         const success = results.filter((result) => result.status === `fulfilled`).length;
         const failed = this.nodes.size - success;
-        this._log(`${success}/${success + failed} nodes spawned`, {
+        this.client.log(`${success}/${success + failed} nodes spawned`, {
             level: `INFO`, system: this.system
         });
         if (failed > 0)
-            this._log(`${failed} nodes failed to spawn`, {
+            this.client.log(`${failed} nodes failed to spawn`, {
                 level: `WARN`, system: this.system
             });
         this.emit(`NODES_READY`, success, failed);
@@ -131,8 +120,8 @@ class Manager extends node_utils_1.TypedEmitter {
             return existing;
         const node = this.availableNodes[0];
         if (!node)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`No available nodes to bind the player to`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
-        const player = new Player_1.Player(this, node, guild, voiceChannel, options, this._log, this._logThisArg);
+            throw new Error(`No available nodes to bind the player to`);
+        const player = new Player_1.Player(this, node, guild, voiceChannel, options);
         this.players.set(guild, player);
         player.on(`VOICE_CONNECTED`, (channel) => this.emit(`PLAYER_VOICE_CONNECTED`, player, channel));
         player.on(`VOICE_MOVED`, (newChannel) => this.emit(`PLAYER_VOICE_MOVED`, player, newChannel));
@@ -174,10 +163,10 @@ class Manager extends node_utils_1.TypedEmitter {
     async search(query, requester, source) {
         const searchNode = this.availableNodes[0];
         if (!searchNode)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`No nodes are available to perform a search`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
+            throw new Error(`No nodes are available to perform a search`);
         const res = await searchNode.request(`GET`, `/loadtracks`, { query: { identifier: /^https?:\/\//.test(query) ? query : `${source ?? this.options.defaultSearchSource}search:${query}` } });
         if (!res)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`No search response data`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_RESPONSE_DATA, this.system);
+            throw new Error(`No search response data`);
         const searchResult = {
             loadType: res.loadType,
             tracks: res.tracks.map((data) => new Track_1.Track({
@@ -202,13 +191,13 @@ class Manager extends node_utils_1.TypedEmitter {
     async decodeTracks(...tracks) {
         const decodeNode = this.availableNodes[0];
         if (!decodeNode)
-            throw new DistypeLavalinkError_1.DistypeLavalinkError(`No nodes are available to decode tracks`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_NODES_AVAILABLE, this.system);
+            throw new Error(`No nodes are available to decode tracks`);
         if (!tracks.length)
             throw new TypeError(`You must provide at least 1 track to decode`);
         else if (tracks.length === 1) {
             const res = await decodeNode.request(`GET`, `/decodetrack`, { query: { track: tracks[0] } });
             if (typeof res !== `object` || res === null)
-                throw new DistypeLavalinkError_1.DistypeLavalinkError(`No decode response data`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_RESPONSE_DATA, this.system);
+                throw new Error(`No decode response data`);
             return [
                 new Track_1.Track({
                     track: tracks[0],
@@ -219,7 +208,7 @@ class Manager extends node_utils_1.TypedEmitter {
         else {
             const res = await decodeNode.request(`POST`, `/decodetracks`, { body: tracks });
             if (!Array.isArray(res))
-                throw new DistypeLavalinkError_1.DistypeLavalinkError(`No decode response data`, DistypeLavalinkError_1.DistypeLavalinkErrorType.MANAGER_NO_RESPONSE_DATA, this.system);
+                throw new Error(`No decode response data`);
             return res.map((data) => new Track_1.Track({
                 track: data.track,
                 ...data.info

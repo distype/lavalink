@@ -1,7 +1,6 @@
 import { Manager } from './Manager';
 import { Node } from './Node';
 import { Track } from './Track';
-import { LogCallback } from '../types/Log';
 import { TypedEmitter } from '@br88c/node-utils';
 import { GatewayVoiceStateUpdateDispatchData } from 'discord-api-types/v10';
 import { Snowflake } from 'distype';
@@ -206,7 +205,7 @@ export declare class Player extends TypedEmitter<PlayerEvents> {
      */
     readonly options: Required<PlayerOptions>;
     /**
-     * The system string used for emitting errors and for the {@link LogCallback log callback}.
+     * The system string used for logging.
      */
     readonly system: `Lavalink Player ${Snowflake}`;
     /**
@@ -217,10 +216,6 @@ export declare class Player extends TypedEmitter<PlayerEvents> {
      * If the connected voice channel is a stage.
      */
     private _isStage;
-    /**
-     * The {@link LogCallback log callback} used by the node.
-     */
-    private _log;
     /**
      * A helper variable for setting the player's state after sending a play op with pause set to true.
      */
@@ -236,10 +231,8 @@ export declare class Player extends TypedEmitter<PlayerEvents> {
      * @param guild The player's guild.
      * @param voiceChannel The player's voice channel.
      * @param options The player's {@link PlayerOptions options}.
-     * @param logCallback A {@link LogCallback callback} to be used for logging events internally in the player.
-     * @param logThisArg A value to use as `this` in the `logCallback`.
      */
-    constructor(manager: Manager, node: Node, guild: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions, logCallback?: LogCallback, logThisArg?: any);
+    constructor(manager: Manager, node: Node, guild: Snowflake, voiceChannel: Snowflake, options?: PlayerOptions);
     /**
      * If the player is paused.
      */
